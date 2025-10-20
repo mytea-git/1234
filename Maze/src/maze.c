@@ -1,59 +1,83 @@
 
 /*********************************************************************************************************
-  °üº¬Í·ÎÄ¼ş
+  åŒ…å«å¤´æ–‡ä»¶
 *********************************************************************************************************/
 #include "Maze.h"
-
+#include <limits.h> // ä¸ºäº†ä½¿ç”¨ UINT_MAX
+#include <stdlib.h> // ä¸ºäº† abs å‡½æ•° (è™½ç„¶åœ¨æä¾›çš„ä»£ç ä¸­æ²¡ç›´æ¥ç”¨absï¼Œä½†è®¡ç®—æ›¼å“ˆé¡¿è·ç¦»æ—¶å¯èƒ½éœ€è¦ï¼Œæˆ–è€…å°†æ¥æ‰©å±•æ—¶ç”¨åˆ°)
 
 /*********************************************************************************************************
-  È«¾Ö±äÁ¿¶¨Òå
+  å…¨å±€å˜é‡å®šä¹‰
 *********************************************************************************************************/
-static uchar    GucXStart                           = 0;                /*  Æğµãºá×ø±ê                  */
-static uchar    GucYStart                           = 0;                /*  Æğµã×İ×ø±ê                  */
+static uchar    GucXStart                           = 0;                /*  èµ·ç‚¹æ¨ªåæ ‡                  */
+static uchar    GucYStart                           = 0;                /*  èµ·ç‚¹çºµåæ ‡                  */
 
-static uchar    GucXGoal0                           = XDST0;            /*  ÖÕµãX×ø±ê£¬ÓĞÁ½¸öÖµ         */
+static uchar    GucXGoal0                           = XDST0;            /*  ç»ˆç‚¹Xåæ ‡ï¼Œæœ‰ä¸¤ä¸ªå€¼         */
 static uchar    GucXGoal1                           = XDST1;
-static uchar    GucYGoal0                           = YDST0;            /*  ÖÕµãY×ø±ê£¬ÓĞÁ½¸öÖµ         */
+static uchar    GucYGoal0                           = YDST0;            /*  ç»ˆç‚¹Yåæ ‡ï¼Œæœ‰ä¸¤ä¸ªå€¼         */
 static uchar    GucYGoal1                           = YDST1;
 
-static uchar    GucMouseTask                        = WAIT;             /*  ×´Ì¬»ú£¬³õÊ¼×´Ì¬ÎªµÈ´ı      */
+static uchar    GucMouseTask                        = WAIT;             /*  çŠ¶æ€æœºï¼Œåˆå§‹çŠ¶æ€ä¸ºç­‰å¾…      */
 
-static uchar    GucMapStep[MAZETYPE][MAZETYPE]      = {0xff};           /*  ±£´æ¸÷×ø±êµÄµÈ¸ßÖµ          */
+static uchar    GucMapStep[MAZETYPE][MAZETYPE]      = {0xff};           /*  ä¿å­˜å„åæ ‡çš„ç­‰é«˜å€¼          */
 
-static MAZECOOR GmcStack[MAZETYPE * MAZETYPE]       = {0};              /*  ÔÚmapStepEdit()ÖĞ×÷¶ÑÕ»Ê¹ÓÃ */
-static MAZECOOR GmcCrossway[MAZETYPE * MAZETYPE]    = {0};              /*  Main()ÖĞÔİ´æÎ´×ß¹ıÖ§Â·×ø±ê  */
+static MAZECOOR GmcStack[MAZETYPE * MAZETYPE]       = {0};              /*  åœ¨mapStepEdit()ä¸­ä½œå †æ ˆä½¿ç”¨ */
+static MAZECOOR GmcCrossway[MAZETYPE * MAZETYPE]    = {0};              /*  Main()ä¸­æš‚å­˜æœªèµ°è¿‡æ”¯è·¯åæ ‡  */
+// A* èŠ‚ç‚¹ç»“æ„
+typedef struct {
+    MAZECOOR parent;
+    uint gCost;
+    uint hCost;
+    uint fCost;
+    uchar onOpenList;
+    uchar onClosedList;
+} AStarNode;
+
+// å…¨å±€ A* èŠ‚ç‚¹ä¿¡æ¯æ•°ç»„
+static AStarNode aStarNodes[MAZETYPE][MAZETYPE];
+
+// å¼€æ”¾åˆ—è¡¨
+#define OPEN_LIST_MAX_SIZE (MAZETYPE * MAZETYPE)
+static MAZECOOR openList[OPEN_LIST_MAX_SIZE];
+static int openListSize = 0;
 /*********************************************************************************************************
 ** Function name:       Delay
-** Descriptions:        ÑÓÊ±º¯Êı
-** input parameters:    uiD :ÑÓÊ±²ÎÊı£¬ÖµÔ½´ó£¬ÑÓÊ±Ô½¾Ã
-** output parameters:   ÎŞ
-** Returned value:      ÎŞ
+** Descriptions:        å»¶æ—¶å‡½æ•°
+** input parameters:    uiD :å»¶æ—¶å‚æ•°ï¼Œå€¼è¶Šå¤§ï¼Œå»¶æ—¶è¶Šä¹…
+** output parameters:   æ— 
+** Returned value:      æ— 
 *********************************************************************************************************/
 void delay (uint uiD)
 {
     for (; uiD; uiD--);
 }
-
+// è®¡ç®—æ›¼å“ˆé¡¿è·ç¦»ä½œä¸ºå¯å‘å¼æˆæœ¬ h(n)
+uint calculateHeuristic(char cX1, char cY1, char cX2, char cY2) {
+    uint dx = (cX1 > cX2) ? (cX1 - cX2) : (cX2 - cX1);
+    uint dy = (cY1 > cY2) ? (cY1 - cY2) : (cY2 - cY1);
+    // å‡è®¾ç§»åŠ¨ä¸€æ ¼çš„æˆæœ¬æ˜¯ 1
+    return dx + dy;
+}   
 /*********************************************************************************************************
 ** Function name:       mapStepEdit
-** Descriptions:        ÖÆ×÷ÒÔÄ¿±êµãÎªÆğµãµÄµÈ¸ßÍ¼
-** input parameters:    uiX:    Ä¿µÄµØºá×ø±ê
-**                      uiY:    Ä¿µÄµØ×İ×ø±ê
-** output parameters:   GucMapStep[][]:  ¸÷×ø±êÉÏµÄµÈ¸ßÖµ
-** Returned value:      ÎŞ
+** Descriptions:        åˆ¶ä½œä»¥ç›®æ ‡ç‚¹ä¸ºèµ·ç‚¹çš„ç­‰é«˜å›¾
+** input parameters:    uiX:    ç›®çš„åœ°æ¨ªåæ ‡
+**                      uiY:    ç›®çš„åœ°çºµåæ ‡
+** output parameters:   GucMapStep[][]:  å„åæ ‡ä¸Šçš„ç­‰é«˜å€¼
+** Returned value:      æ— 
 *********************************************************************************************************/
 void mapStepEdit (char  cX, char  cY)
 {
-    uchar n         = 0;                                                /*  GmcStack[]ÏÂ±ê              */
-    uchar ucStep    = 1;                                                /*  µÈ¸ßÖµ                      */
-    uchar ucStat    = 0;                                                /*  Í³¼Æ¿ÉÇ°½øµÄ·½ÏòÊı          */
+    uchar n         = 0;                                                /*  GmcStack[]ä¸‹æ ‡              */
+    uchar ucStep    = 1;                                                /*  ç­‰é«˜å€¼                      */
+    uchar ucStat    = 0;                                                /*  ç»Ÿè®¡å¯å‰è¿›çš„æ–¹å‘æ•°          */
     uchar i,j;
     
-    GmcStack[n].cX  = cX;                                               /*  ÆğµãXÖµÈëÕ»                 */
-    GmcStack[n].cY  = cY;                                               /*  ÆğµãYÖµÈëÕ»                 */
+    GmcStack[n].cX  = cX;                                               /*  èµ·ç‚¹Xå€¼å…¥æ ˆ                 */
+    GmcStack[n].cY  = cY;                                               /*  èµ·ç‚¹Yå€¼å…¥æ ˆ                 */
     n++;
     /*
-     *  ³õÊ¼»¯¸÷×ø±êµÈ¸ßÖµ
+     *  åˆå§‹åŒ–å„åæ ‡ç­‰é«˜å€¼
      */
     for (i = 0; i < MAZETYPE; i++) {
         for (j = 0; j < MAZETYPE; j++) {
@@ -61,34 +85,34 @@ void mapStepEdit (char  cX, char  cY)
         }
     }
     /*
-     *  ÖÆ×÷µÈ¸ßÍ¼£¬Ö±µ½¶ÑÕ»ÖĞËùÓĞÊı¾İ´¦ÀíÍê±Ï
+     *  åˆ¶ä½œç­‰é«˜å›¾ï¼Œç›´åˆ°å †æ ˆä¸­æ‰€æœ‰æ•°æ®å¤„ç†å®Œæ¯•
      */
     while (n) {
-        GucMapStep[cX][cY] = ucStep++;                                  /*  ÌîÈëµÈ¸ßÖµ                  */
+        GucMapStep[cX][cY] = ucStep++;                                  /*  å¡«å…¥ç­‰é«˜å€¼                  */
 
         /*
-         *  ¶Ôµ±Ç°×ø±ê¸ñÀï¿ÉÇ°½øµÄ·½ÏòÍ³¼Æ
+         *  å¯¹å½“å‰åæ ‡æ ¼é‡Œå¯å‰è¿›çš„æ–¹å‘ç»Ÿè®¡
          */
         ucStat = 0;
-        if ((GucMapBlock[cX][cY] & 0x01) &&                             /*  Ç°·½ÓĞÂ·                    */
-            (GucMapStep[cX][cY + 1] > (ucStep))) {                      /*  Ç°·½µÈ¸ßÖµ´óÓÚ¼Æ»®Éè¶¨Öµ    */
-            ucStat++;                                                   /*  ¿ÉÇ°½ø·½ÏòÊı¼Ó1             */
+        if ((GucMapBlock[cX][cY] & 0x01) &&                             /*  å‰æ–¹æœ‰è·¯                    */
+            (GucMapStep[cX][cY + 1] > (ucStep))) {                      /*  å‰æ–¹ç­‰é«˜å€¼å¤§äºè®¡åˆ’è®¾å®šå€¼    */
+            ucStat++;                                                   /*  å¯å‰è¿›æ–¹å‘æ•°åŠ 1             */
         }
-        if ((GucMapBlock[cX][cY] & 0x02) &&                             /*  ÓÒ·½ÓĞÂ·                    */
-            (GucMapStep[cX + 1][cY] > (ucStep))) {                      /*  ÓÒ·½µÈ¸ßÖµ´óÓÚ¼Æ»®Éè¶¨Öµ    */
-            ucStat++;                                                   /*  ¿ÉÇ°½ø·½ÏòÊı¼Ó1             */
+        if ((GucMapBlock[cX][cY] & 0x02) &&                             /*  å³æ–¹æœ‰è·¯                    */
+            (GucMapStep[cX + 1][cY] > (ucStep))) {                      /*  å³æ–¹ç­‰é«˜å€¼å¤§äºè®¡åˆ’è®¾å®šå€¼    */
+            ucStat++;                                                   /*  å¯å‰è¿›æ–¹å‘æ•°åŠ 1             */
         }
         if ((GucMapBlock[cX][cY] & 0x04) &&
             (GucMapStep[cX][cY - 1] > (ucStep))) {
-            ucStat++;                                                   /*  ¿ÉÇ°½ø·½ÏòÊı¼Ó1             */
+            ucStat++;                                                   /*  å¯å‰è¿›æ–¹å‘æ•°åŠ 1             */
         }
         if ((GucMapBlock[cX][cY] & 0x08) &&
             (GucMapStep[cX - 1][cY] > (ucStep))) {
-            ucStat++;                                                   /*  ¿ÉÇ°½ø·½ÏòÊı¼Ó1             */
+            ucStat++;                                                   /*  å¯å‰è¿›æ–¹å‘æ•°åŠ 1             */
         }
         /*
-         *  Ã»ÓĞ¿ÉÇ°½øµÄ·½Ïò£¬ÔòÌø×ªµ½×î½ü±£´æµÄ·ÖÖ§µã
-         *  ·ñÔòÈÎÑ¡Ò»¿ÉÇ°½ø·½ÏòÇ°½ø
+         *  æ²¡æœ‰å¯å‰è¿›çš„æ–¹å‘ï¼Œåˆ™è·³è½¬åˆ°æœ€è¿‘ä¿å­˜çš„åˆ†æ”¯ç‚¹
+         *  å¦åˆ™ä»»é€‰ä¸€å¯å‰è¿›æ–¹å‘å‰è¿›
          */
         if (ucStat == 0) {
             n--;
@@ -96,32 +120,32 @@ void mapStepEdit (char  cX, char  cY)
             cY = GmcStack[n].cY;
             ucStep = GucMapStep[cX][cY];
         } else {
-            if (ucStat > 1) {                                           /*  ÓĞ¶à¸ö¿ÉÇ°½ø·½Ïò£¬±£´æ×ø±ê  */
-                GmcStack[n].cX = cX;                                    /*  ºá×ø±êXÖµÈëÕ»               */
-                GmcStack[n].cY = cY;                                    /*  ×İ×ø±êYÖµÈëÕ»               */
+            if (ucStat > 1) {                                           /*  æœ‰å¤šä¸ªå¯å‰è¿›æ–¹å‘ï¼Œä¿å­˜åæ ‡  */
+                GmcStack[n].cX = cX;                                    /*  æ¨ªåæ ‡Xå€¼å…¥æ ˆ               */
+                GmcStack[n].cY = cY;                                    /*  çºµåæ ‡Yå€¼å…¥æ ˆ               */
                 n++;
             }
             /*
-             *  ÈÎÒâÑ¡ÔñÒ»Ìõ¿ÉÇ°½øµÄ·½ÏòÇ°½ø
+             *  ä»»æ„é€‰æ‹©ä¸€æ¡å¯å‰è¿›çš„æ–¹å‘å‰è¿›
              */
-            if ((GucMapBlock[cX][cY] & 0x01) &&                         /*  ÉÏ·½ÓĞÂ·                    */
-                (GucMapStep[cX][cY + 1] > (ucStep))) {                  /*  ÉÏ·½µÈ¸ßÖµ´óÓÚ¼Æ»®Éè¶¨Öµ    */
-                cY++;                                                   /*  ĞŞ¸Ä×ø±ê                    */
+            if ((GucMapBlock[cX][cY] & 0x01) &&                         /*  ä¸Šæ–¹æœ‰è·¯                    */
+                (GucMapStep[cX][cY + 1] > (ucStep))) {                  /*  ä¸Šæ–¹ç­‰é«˜å€¼å¤§äºè®¡åˆ’è®¾å®šå€¼    */
+                cY++;                                                   /*  ä¿®æ”¹åæ ‡                    */
                 continue;
             }
-            if ((GucMapBlock[cX][cY] & 0x02) &&                         /*  ÓÒ·½ÓĞÂ·                    */
-                (GucMapStep[cX + 1][cY] > (ucStep))) {                  /*  ÓÒ·½µÈ¸ßÖµ´óÓÚ¼Æ»®Éè¶¨Öµ    */
-                cX++;                                                   /*  ĞŞ¸Ä×ø±ê                    */
+            if ((GucMapBlock[cX][cY] & 0x02) &&                         /*  å³æ–¹æœ‰è·¯                    */
+                (GucMapStep[cX + 1][cY] > (ucStep))) {                  /*  å³æ–¹ç­‰é«˜å€¼å¤§äºè®¡åˆ’è®¾å®šå€¼    */
+                cX++;                                                   /*  ä¿®æ”¹åæ ‡                    */
                 continue;
             }
-            if ((GucMapBlock[cX][cY] & 0x04) &&                         /*  ÏÂ·½ÓĞÂ·                    */
-                (GucMapStep[cX][cY - 1] > (ucStep))) {                  /*  ÏÂ·½µÈ¸ßÖµ´óÓÚ¼Æ»®Éè¶¨Öµ    */
-                cY--;                                                   /*  ĞŞ¸Ä×ø±ê                    */
+            if ((GucMapBlock[cX][cY] & 0x04) &&                         /*  ä¸‹æ–¹æœ‰è·¯                    */
+                (GucMapStep[cX][cY - 1] > (ucStep))) {                  /*  ä¸‹æ–¹ç­‰é«˜å€¼å¤§äºè®¡åˆ’è®¾å®šå€¼    */
+                cY--;                                                   /*  ä¿®æ”¹åæ ‡                    */
                 continue;
             }
-            if ((GucMapBlock[cX][cY] & 0x08) &&                         /*  ×ó·½ÓĞÂ·                    */
-                (GucMapStep[cX - 1][cY] > (ucStep))) {                  /*  ×ó·½µÈ¸ßÖµ´óÓÚ¼Æ»®Éè¶¨Öµ    */
-                cX--;                                                   /*  ĞŞ¸Ä×ø±ê                    */
+            if ((GucMapBlock[cX][cY] & 0x08) &&                         /*  å·¦æ–¹æœ‰è·¯                    */
+                (GucMapStep[cX - 1][cY] > (ucStep))) {                  /*  å·¦æ–¹ç­‰é«˜å€¼å¤§äºè®¡åˆ’è®¾å®šå€¼    */
+                cX--;                                                   /*  ä¿®æ”¹åæ ‡                    */
                 continue;
             }
         }
@@ -129,60 +153,60 @@ void mapStepEdit (char  cX, char  cY)
 }
 /*********************************************************************************************************
 ** Function name:       mouseSpurt
-** Descriptions:        µçÄÔÊó´ÓÆğµãÒÔ×î¶ÌÂ·¾¶ÅÜÏòÖÕµã
-** input parameters:    ÎŞ
- ** output parameters:  ÎŞ
-** Returned value:      ÎŞ
+** Descriptions:        ç”µè„‘é¼ ä»èµ·ç‚¹ä»¥æœ€çŸ­è·¯å¾„è·‘å‘ç»ˆç‚¹
+** input parameters:    æ— 
+ ** output parameters:  æ— 
+** Returned value:      æ— 
 *********************************************************************************************************/
 void mouseSpurt (void)
 {
     uchar ucTemp = 0xff;
     char cXdst = 0,cYdst = 0;
     /*
-     *  ¶ÔÖÕµãµÄËÄ¸ö×ø±ê·Ö±ğÖÆ×÷µÈ¸ßÍ¼
-     *  È¡ÀëÆğµã×î½üµÄÒ»¸öµã×÷ÎªÄ¿±êµã
+     *  å¯¹ç»ˆç‚¹çš„å››ä¸ªåæ ‡åˆ†åˆ«åˆ¶ä½œç­‰é«˜å›¾
+     *  å–ç¦»èµ·ç‚¹æœ€è¿‘çš„ä¸€ä¸ªç‚¹ä½œä¸ºç›®æ ‡ç‚¹
      */
-    if (GucMapBlock[GucXGoal0][GucYGoal0] & 0x0c) {                     /*  ÅĞ¶Ï¸ÃÖÕµã×ø±êÊÇ·ñÓĞ³ö¿Ú    */
-        mapStepEdit(GucXGoal0,GucYGoal0);                               /*  ÖÆ×÷µÈ¸ßÍ¼                  */
-        if (ucTemp > GucMapStep[GucXStart][GucYStart]) {                /*  ±£´æÀëÆğµã×î½üµÄ×ø±ê        */
+    if (GucMapBlock[GucXGoal0][GucYGoal0] & 0x0c) {                     /*  åˆ¤æ–­è¯¥ç»ˆç‚¹åæ ‡æ˜¯å¦æœ‰å‡ºå£    */
+        mapStepEdit(GucXGoal0,GucYGoal0);                               /*  åˆ¶ä½œç­‰é«˜å›¾                  */
+        if (ucTemp > GucMapStep[GucXStart][GucYStart]) {                /*  ä¿å­˜ç¦»èµ·ç‚¹æœ€è¿‘çš„åæ ‡        */
             cXdst  = GucXGoal0;
             cYdst  = GucYGoal0;
             ucTemp = GucMapStep[GucXStart][GucYStart];
         }
     }
-    if (GucMapBlock[GucXGoal0][GucYGoal1] & 0x09) {                     /*  ÅĞ¶Ï¸ÃÖÕµã×ø±êÊÇ·ñÓĞ³ö¿Ú    */
-        mapStepEdit(GucXGoal0,GucYGoal1);                               /*  ÖÆ×÷µÈ¸ßÍ¼                  */
-        if (ucTemp > GucMapStep[GucXStart][GucYStart]) {                /*  ±£´æÀëÆğµã×î½üµÄ×ø±ê        */
+    if (GucMapBlock[GucXGoal0][GucYGoal1] & 0x09) {                     /*  åˆ¤æ–­è¯¥ç»ˆç‚¹åæ ‡æ˜¯å¦æœ‰å‡ºå£    */
+        mapStepEdit(GucXGoal0,GucYGoal1);                               /*  åˆ¶ä½œç­‰é«˜å›¾                  */
+        if (ucTemp > GucMapStep[GucXStart][GucYStart]) {                /*  ä¿å­˜ç¦»èµ·ç‚¹æœ€è¿‘çš„åæ ‡        */
             cXdst  = GucXGoal0;
             cYdst  = GucYGoal1;
             ucTemp = GucMapStep[GucXStart][GucYStart];
         }
     }
-    if (GucMapBlock[GucXGoal1][GucYGoal0] & 0x06) {                     /*  ÅĞ¶Ï¸ÃÖÕµã×ø±êÊÇ·ñÓĞ³ö¿Ú    */
-        mapStepEdit(GucXGoal1,GucYGoal0);                               /*  ÖÆ×÷µÈ¸ßÍ¼                  */
-        if (ucTemp > GucMapStep[GucXStart][GucYStart]) {                /*  ±£´æÀëÆğµã×î½üµÄ×ø±ê        */
+    if (GucMapBlock[GucXGoal1][GucYGoal0] & 0x06) {                     /*  åˆ¤æ–­è¯¥ç»ˆç‚¹åæ ‡æ˜¯å¦æœ‰å‡ºå£    */
+        mapStepEdit(GucXGoal1,GucYGoal0);                               /*  åˆ¶ä½œç­‰é«˜å›¾                  */
+        if (ucTemp > GucMapStep[GucXStart][GucYStart]) {                /*  ä¿å­˜ç¦»èµ·ç‚¹æœ€è¿‘çš„åæ ‡        */
             cXdst  = GucXGoal1;
             cYdst  = GucYGoal0;
             ucTemp = GucMapStep[GucXStart][GucYStart];
         }
     }
-    if (GucMapBlock[GucXGoal1][GucYGoal1] & 0x03) {                     /*  ÅĞ¶Ï¸ÃÖÕµã×ø±êÊÇ·ñÓĞ³ö¿Ú    */
-        mapStepEdit(GucXGoal1,GucYGoal1);                               /*  ÖÆ×÷µÈ¸ßÍ¼                  */
-        if (ucTemp > GucMapStep[GucXStart][GucYStart]) {                /*  ±£´æÀëÆğµã×î½üµÄ×ø±ê        */
+    if (GucMapBlock[GucXGoal1][GucYGoal1] & 0x03) {                     /*  åˆ¤æ–­è¯¥ç»ˆç‚¹åæ ‡æ˜¯å¦æœ‰å‡ºå£    */
+        mapStepEdit(GucXGoal1,GucYGoal1);                               /*  åˆ¶ä½œç­‰é«˜å›¾                  */
+        if (ucTemp > GucMapStep[GucXStart][GucYStart]) {                /*  ä¿å­˜ç¦»èµ·ç‚¹æœ€è¿‘çš„åæ ‡        */
             cXdst  = GucXGoal1;
             cYdst  = GucYGoal1;
             ucTemp = GucMapStep[GucXStart][GucYStart];
         }
     }
-    objectGoTo(cXdst,cYdst);                                            /*  ÔËĞĞµ½Ö¸¶¨Ä¿±êµã            */
+    objectGoTo(cXdst,cYdst);                                            /*  è¿è¡Œåˆ°æŒ‡å®šç›®æ ‡ç‚¹            */
 }
 /*********************************************************************************************************
 ** Function name:       objectGoTo
-** Descriptions:        Ê¹µçÄÔÊóÔË¶¯µ½Ö¸¶¨×ø±ê
-** input parameters:    cXdst: Ä¿µÄµØµÄºá×ø±ê
-**                      cYdst: Ä¿µÄµØµÄ×İ×ø±ê
-** output parameters:   ÎŞ
-** Returned value:      ÎŞ
+** Descriptions:        ä½¿ç”µè„‘é¼ è¿åŠ¨åˆ°æŒ‡å®šåæ ‡
+** input parameters:    cXdst: ç›®çš„åœ°çš„æ¨ªåæ ‡
+**                      cYdst: ç›®çš„åœ°çš„çºµåæ ‡
+** output parameters:   æ— 
+** Returned value:      æ— 
 *********************************************************************************************************/
 void objectGoTo (char  cXdst, char  cYdst)
 {
@@ -191,60 +215,60 @@ void objectGoTo (char  cXdst, char  cYdst)
     char cX,cY;
     cX = GmcMouse.cX;
     cY = GmcMouse.cY;
-    mapStepEdit(cXdst,cYdst);                                           /*  ÖÆ×÷µÈ¸ßÍ¼                  */
+    mapStepEdit(cXdst,cYdst);                                           /*  åˆ¶ä½œç­‰é«˜å›¾                  */
     /*
-     *  ¸ù¾İµÈ¸ßÖµÏòÄ¿±êµãÔË¶¯£¬Ö±µ½´ïµ½Ä¿µÄµØ
+     *  æ ¹æ®ç­‰é«˜å€¼å‘ç›®æ ‡ç‚¹è¿åŠ¨ï¼Œç›´åˆ°è¾¾åˆ°ç›®çš„åœ°
      */
     while ((cX != cXdst) || (cY != cYdst)) {
         ucStep = GucMapStep[cX][cY];
         /*
-         *  ÈÎÑ¡Ò»¸öµÈ¸ßÖµ±Èµ±Ç°×ÔÉíµÈ¸ßÖµĞ¡µÄ·½ÏòÇ°½ø
+         *  ä»»é€‰ä¸€ä¸ªç­‰é«˜å€¼æ¯”å½“å‰è‡ªèº«ç­‰é«˜å€¼å°çš„æ–¹å‘å‰è¿›
          */
-        if ((GucMapBlock[cX][cY] & 0x01) &&                             /*  ÉÏ·½ÓĞÂ·                    */
-            (GucMapStep[cX][cY + 1] < ucStep)) {                        /*  ÉÏ·½µÈ¸ßÖµ½ÏĞ¡              */
-            cDirTemp = UP;                                              /*  ¼ÇÂ¼·½Ïò                    */
-            if (cDirTemp == GucMouseDir) {                              /*  ÓÅÏÈÑ¡Ôñ²»ĞèÒª×ªÍäµÄ·½Ïò    */
-                cNBlock++;                                              /*  Ç°½øÒ»¸ö·½¸ñ                */
+        if ((GucMapBlock[cX][cY] & 0x01) &&                             /*  ä¸Šæ–¹æœ‰è·¯                    */
+            (GucMapStep[cX][cY + 1] < ucStep)) {                        /*  ä¸Šæ–¹ç­‰é«˜å€¼è¾ƒå°              */
+            cDirTemp = UP;                                              /*  è®°å½•æ–¹å‘                    */
+            if (cDirTemp == GucMouseDir) {                              /*  ä¼˜å…ˆé€‰æ‹©ä¸éœ€è¦è½¬å¼¯çš„æ–¹å‘    */
+                cNBlock++;                                              /*  å‰è¿›ä¸€ä¸ªæ–¹æ ¼                */
                 cY++;
-                continue;                                               /*  Ìø¹ı±¾´ÎÑ­»·                */
+                continue;                                               /*  è·³è¿‡æœ¬æ¬¡å¾ªç¯                */
             }
         }
-        if ((GucMapBlock[cX][cY] & 0x02) &&                             /*  ÓÒ·½ÓĞÂ·                    */
-            (GucMapStep[cX + 1][cY] < ucStep)) {                        /*  ÓÒ·½µÈ¸ßÖµ½ÏĞ¡              */
-            cDirTemp = RIGHT;                                           /*  ¼ÇÂ¼·½Ïò                    */
-            if (cDirTemp == GucMouseDir) {                              /*  ÓÅÏÈÑ¡Ôñ²»ĞèÒª×ªÍäµÄ·½Ïò    */
-                cNBlock++;                                              /*  Ç°½øÒ»¸ö·½¸ñ                */
+        if ((GucMapBlock[cX][cY] & 0x02) &&                             /*  å³æ–¹æœ‰è·¯                    */
+            (GucMapStep[cX + 1][cY] < ucStep)) {                        /*  å³æ–¹ç­‰é«˜å€¼è¾ƒå°              */
+            cDirTemp = RIGHT;                                           /*  è®°å½•æ–¹å‘                    */
+            if (cDirTemp == GucMouseDir) {                              /*  ä¼˜å…ˆé€‰æ‹©ä¸éœ€è¦è½¬å¼¯çš„æ–¹å‘    */
+                cNBlock++;                                              /*  å‰è¿›ä¸€ä¸ªæ–¹æ ¼                */
                 cX++;
-                continue;                                               /*  Ìø¹ı±¾´ÎÑ­»·                */
+                continue;                                               /*  è·³è¿‡æœ¬æ¬¡å¾ªç¯                */
             }
         }
-        if ((GucMapBlock[cX][cY] & 0x04) &&                             /*  ÏÂ·½ÓĞÂ·                    */
-            (GucMapStep[cX][cY - 1] < ucStep)) {                        /*  ÏÂ·½µÈ¸ßÖµ½ÏĞ¡              */
-            cDirTemp = DOWN;                                            /*  ¼ÇÂ¼·½Ïò                    */
-            if (cDirTemp == GucMouseDir) {                              /*  ÓÅÏÈÑ¡Ôñ²»ĞèÒª×ªÍäµÄ·½Ïò    */
-                cNBlock++;                                              /*  Ç°½øÒ»¸ö·½¸ñ                */
+        if ((GucMapBlock[cX][cY] & 0x04) &&                             /*  ä¸‹æ–¹æœ‰è·¯                    */
+            (GucMapStep[cX][cY - 1] < ucStep)) {                        /*  ä¸‹æ–¹ç­‰é«˜å€¼è¾ƒå°              */
+            cDirTemp = DOWN;                                            /*  è®°å½•æ–¹å‘                    */
+            if (cDirTemp == GucMouseDir) {                              /*  ä¼˜å…ˆé€‰æ‹©ä¸éœ€è¦è½¬å¼¯çš„æ–¹å‘    */
+                cNBlock++;                                              /*  å‰è¿›ä¸€ä¸ªæ–¹æ ¼                */
                 cY--;
-                continue;                                               /*  Ìø¹ı±¾´ÎÑ­»·                */
+                continue;                                               /*  è·³è¿‡æœ¬æ¬¡å¾ªç¯                */
             }
         }
-        if ((GucMapBlock[cX][cY] & 0x08) &&                             /*  ×ó·½ÓĞÂ·                    */
-            (GucMapStep[cX - 1][cY] < ucStep)) {                        /*  ×ó·½µÈ¸ßÖµ½ÏĞ¡              */
-            cDirTemp = LEFT;                                            /*  ¼ÇÂ¼·½Ïò                    */
-            if (cDirTemp == GucMouseDir) {                              /*  ÓÅÏÈÑ¡Ôñ²»ĞèÒª×ªÍäµÄ·½Ïò    */
-                cNBlock++;                                              /*  Ç°½øÒ»¸ö·½¸ñ                */
+        if ((GucMapBlock[cX][cY] & 0x08) &&                             /*  å·¦æ–¹æœ‰è·¯                    */
+            (GucMapStep[cX - 1][cY] < ucStep)) {                        /*  å·¦æ–¹ç­‰é«˜å€¼è¾ƒå°              */
+            cDirTemp = LEFT;                                            /*  è®°å½•æ–¹å‘                    */
+            if (cDirTemp == GucMouseDir) {                              /*  ä¼˜å…ˆé€‰æ‹©ä¸éœ€è¦è½¬å¼¯çš„æ–¹å‘    */
+                cNBlock++;                                              /*  å‰è¿›ä¸€ä¸ªæ–¹æ ¼                */
                 cX--;
-                continue;                                               /*  Ìø¹ı±¾´ÎÑ­»·                */
+                continue;                                               /*  è·³è¿‡æœ¬æ¬¡å¾ªç¯                */
             }
         }
-        cDirTemp = (cDirTemp + 4 - GucMouseDir)%4;                      /*  ¼ÆËã·½ÏòÆ«ÒÆÁ¿              */
+        cDirTemp = (cDirTemp + 4 - GucMouseDir)%4;                      /*  è®¡ç®—æ–¹å‘åç§»é‡              */
         
         if (cNBlock) {
-            mouseGoahead(cNBlock);                                      /*  Ç°½øcNBlock²½               */
+            mouseGoahead(cNBlock);                                      /*  å‰è¿›cNBlockæ­¥               */
         }        
-        cNBlock = 0;                                                    /*  ÈÎÎñÇåÁã                    */
+        cNBlock = 0;                                                    /*  ä»»åŠ¡æ¸…é›¶                    */
         
         /*
-         *  ¿ØÖÆµçÄÔÊó×ªÍä
+         *  æ§åˆ¶ç”µè„‘é¼ è½¬å¼¯
          */
         switch (cDirTemp) {
 
@@ -265,7 +289,7 @@ void objectGoTo (char  cXdst, char  cYdst)
         }
     }
     /*
-     *  ÅĞ¶ÏÈÎÎñÊÇ·ñÍê³É£¬·ñÔò¼ÌĞøÇ°½ø
+     *  åˆ¤æ–­ä»»åŠ¡æ˜¯å¦å®Œæˆï¼Œå¦åˆ™ç»§ç»­å‰è¿›
      */
     if (cNBlock) {
         mouseGoahead(cNBlock);
@@ -273,17 +297,17 @@ void objectGoTo (char  cXdst, char  cYdst)
 }
 /*********************************************************************************************************
 ** Function name:       mazeBlockDataGet
-** Descriptions:        ¸ù¾İµçÄÔÊóµÄÏà¶Ô·½Ïò£¬È¡³ö¸Ã·½ÏòÉÏÃÔ¹¬¸ñµÄÇ½±Ú×ÊÁÏ
-** input parameters:    ucDir: µçÄÔÊóµÄÏà¶Ô·½Ïò
-** output parameters:   ÎŞ
-** Returned value:      GucMapBlock[cX][cY] : Ç½±Ú×ÊÁÏ
+** Descriptions:        æ ¹æ®ç”µè„‘é¼ çš„ç›¸å¯¹æ–¹å‘ï¼Œå–å‡ºè¯¥æ–¹å‘ä¸Šè¿·å®«æ ¼çš„å¢™å£èµ„æ–™
+** input parameters:    ucDir: ç”µè„‘é¼ çš„ç›¸å¯¹æ–¹å‘
+** output parameters:   æ— 
+** Returned value:      GucMapBlock[cX][cY] : å¢™å£èµ„æ–™
 *********************************************************************************************************/
 uchar mazeBlockDataGet (uchar  ucDirTemp)
 {
     char cX = 0,cY = 0;
     
     /*
-     *  °ÑµçÄÔÊóµÄÏà¶Ô·½Ïò×ª»»Îª¾ø¶Ô·½Ïò
+     *  æŠŠç”µè„‘é¼ çš„ç›¸å¯¹æ–¹å‘è½¬æ¢ä¸ºç»å¯¹æ–¹å‘
      */
     switch (ucDirTemp) {
 
@@ -304,7 +328,7 @@ uchar mazeBlockDataGet (uchar  ucDirTemp)
     }
     
     /*
-     *  ¸ù¾İ¾ø¶Ô·½Ïò¼ÆËã¸Ã·½ÏòÉÏÏàÁÚ¸ñµÄ×ø±ê
+     *  æ ¹æ®ç»å¯¹æ–¹å‘è®¡ç®—è¯¥æ–¹å‘ä¸Šç›¸é‚»æ ¼çš„åæ ‡
      */
     switch (ucDirTemp) {
 
@@ -332,110 +356,110 @@ uchar mazeBlockDataGet (uchar  ucDirTemp)
         break;
     }
     
-    return(GucMapBlock[cX][cY]);                                        /*  ·µ»ØÃÔ¹¬¸ñÉÏµÄ×ÊÁÏ          */
+    return(GucMapBlock[cX][cY]);                                        /*  è¿”å›è¿·å®«æ ¼ä¸Šçš„èµ„æ–™          */
 }
 /*********************************************************************************************************
 ** Function name:       rightMethod
-** Descriptions:        ÓÒÊÖ·¨Ôò£¬ÓÅÏÈÏòÓÒÇ°½ø
-** input parameters:    ÎŞ
-** output parameters:   ÎŞ
-** Returned value:      ÎŞ
+** Descriptions:        å³æ‰‹æ³•åˆ™ï¼Œä¼˜å…ˆå‘å³å‰è¿›
+** input parameters:    æ— 
+** output parameters:   æ— 
+** Returned value:      æ— 
 *********************************************************************************************************/
 void rightMethod (void)
 {
-    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_R) &&         /*  µçÄÔÊóµÄÓÒ±ßÓĞÂ·            */
-        (mazeBlockDataGet(MOUSERIGHT) == 0x00)) {                       /*  µçÄÔÊóµÄÓÒ±ßÃ»ÓĞ×ß¹ı        */
-        mouseTurnright();                                               /*  µçÄÔÊóÓÒ×ª                  */
+    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_R) &&         /*  ç”µè„‘é¼ çš„å³è¾¹æœ‰è·¯            */
+        (mazeBlockDataGet(MOUSERIGHT) == 0x00)) {                       /*  ç”µè„‘é¼ çš„å³è¾¹æ²¡æœ‰èµ°è¿‡        */
+        mouseTurnright();                                               /*  ç”µè„‘é¼ å³è½¬                  */
         return;
     }
-    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_F) &&         /*  µçÄÔÊóµÄÇ°·½ÓĞÂ·            */
-        (mazeBlockDataGet(MOUSEFRONT) == 0x00)) {                       /*  µçÄÔÊóµÄÇ°·½Ã»ÓĞ×ß¹ı        */
-        return;                                                         /*  µçÄÔÊó²»ÓÃ×ªÍä              */
+    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_F) &&         /*  ç”µè„‘é¼ çš„å‰æ–¹æœ‰è·¯            */
+        (mazeBlockDataGet(MOUSEFRONT) == 0x00)) {                       /*  ç”µè„‘é¼ çš„å‰æ–¹æ²¡æœ‰èµ°è¿‡        */
+        return;                                                         /*  ç”µè„‘é¼ ä¸ç”¨è½¬å¼¯              */
     }
-    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_L) &&         /*  µçÄÔÊóµÄ×ó±ßÓĞÂ·            */
-        (mazeBlockDataGet(MOUSELEFT ) == 0x00)) {                       /*  µçÄÔÊóµÄ×ó±ßÃ»ÓĞ×ß¹ı        */
-        mouseTurnleft();                                                /*  µçÄÔÊó×ó×ª                  */
+    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_L) &&         /*  ç”µè„‘é¼ çš„å·¦è¾¹æœ‰è·¯            */
+        (mazeBlockDataGet(MOUSELEFT ) == 0x00)) {                       /*  ç”µè„‘é¼ çš„å·¦è¾¹æ²¡æœ‰èµ°è¿‡        */
+        mouseTurnleft();                                                /*  ç”µè„‘é¼ å·¦è½¬                  */
         return;
     }
 }
 /*********************************************************************************************************
 ** Function name:       leftMethod
-** Descriptions:        ×óÊÖ·¨Ôò£¬ÓÅÏÈÏò×óÔË¶¯
-** input parameters:    ÎŞ
-** output parameters:   ÎŞ
-** Returned value:      ÎŞ
+** Descriptions:        å·¦æ‰‹æ³•åˆ™ï¼Œä¼˜å…ˆå‘å·¦è¿åŠ¨
+** input parameters:    æ— 
+** output parameters:   æ— 
+** Returned value:      æ— 
 *********************************************************************************************************/
 void leftMethod (void)
 {
-    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_L) &&         /*  µçÄÔÊóµÄ×ó±ßÓĞÂ·            */
-        (mazeBlockDataGet(MOUSELEFT ) == 0x00)) {                       /*  µçÄÔÊóµÄ×ó±ßÃ»ÓĞ×ß¹ı        */
-        mouseTurnleft();                                                /*  µçÄÔÊó×ó×ª                  */
+    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_L) &&         /*  ç”µè„‘é¼ çš„å·¦è¾¹æœ‰è·¯            */
+        (mazeBlockDataGet(MOUSELEFT ) == 0x00)) {                       /*  ç”µè„‘é¼ çš„å·¦è¾¹æ²¡æœ‰èµ°è¿‡        */
+        mouseTurnleft();                                                /*  ç”µè„‘é¼ å·¦è½¬                  */
         return;
     }
-    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_F) &&         /*  µçÄÔÊóµÄÇ°·½ÓĞÂ·            */
-        (mazeBlockDataGet(MOUSEFRONT) == 0x00)) {                       /*  µçÄÔÊóµÄÇ°·½Ã»ÓĞ×ß¹ı        */
-        return;                                                         /*  µçÄÔÊó²»ÓÃ×ªÍä              */
+    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_F) &&         /*  ç”µè„‘é¼ çš„å‰æ–¹æœ‰è·¯            */
+        (mazeBlockDataGet(MOUSEFRONT) == 0x00)) {                       /*  ç”µè„‘é¼ çš„å‰æ–¹æ²¡æœ‰èµ°è¿‡        */
+        return;                                                         /*  ç”µè„‘é¼ ä¸ç”¨è½¬å¼¯              */
     }
-    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_R) &&         /*  µçÄÔÊóµÄÓÒ±ßÓĞÂ·            */
-        (mazeBlockDataGet(MOUSERIGHT) == 0x00)) {                       /*  µçÄÔÊóµÄÓÒ±ßÃ»ÓĞ×ß¹ı        */
-        mouseTurnright();                                               /*  µçÄÔÊóÓÒ×ª                  */
+    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_R) &&         /*  ç”µè„‘é¼ çš„å³è¾¹æœ‰è·¯            */
+        (mazeBlockDataGet(MOUSERIGHT) == 0x00)) {                       /*  ç”µè„‘é¼ çš„å³è¾¹æ²¡æœ‰èµ°è¿‡        */
+        mouseTurnright();                                               /*  ç”µè„‘é¼ å³è½¬                  */
         return;
     }
 }
 /*********************************************************************************************************
 ** Function name:       frontRightMethod
-** Descriptions:        ÖĞÓÒ·¨Ôò£¬ÓÅÏÈÏòÇ°ÔËĞĞ£¬Æä´ÎÏòÓÒ
-** input parameters:    ÎŞ
-** output parameters:   ÎŞ
-** Returned value:      ÎŞ
+** Descriptions:        ä¸­å³æ³•åˆ™ï¼Œä¼˜å…ˆå‘å‰è¿è¡Œï¼Œå…¶æ¬¡å‘å³
+** input parameters:    æ— 
+** output parameters:   æ— 
+** Returned value:      æ— 
 *********************************************************************************************************/
 void frontRightMethod (void)
 {
-    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_F) &&         /*  µçÄÔÊóµÄÇ°·½ÓĞÂ·            */
-        (mazeBlockDataGet(MOUSEFRONT) == 0x00)) {                       /*  µçÄÔÊóµÄÇ°·½Ã»ÓĞ×ß¹ı        */
-        return;                                                         /*  µçÄÔÊó²»ÓÃ×ªÍä              */
+    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_F) &&         /*  ç”µè„‘é¼ çš„å‰æ–¹æœ‰è·¯            */
+        (mazeBlockDataGet(MOUSEFRONT) == 0x00)) {                       /*  ç”µè„‘é¼ çš„å‰æ–¹æ²¡æœ‰èµ°è¿‡        */
+        return;                                                         /*  ç”µè„‘é¼ ä¸ç”¨è½¬å¼¯              */
     }
-    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_R) &&         /*  µçÄÔÊóµÄÓÒ±ßÓĞÂ·            */
-        (mazeBlockDataGet(MOUSERIGHT) == 0x00)) {                       /*  µçÄÔÊóµÄÓÒ±ßÃ»ÓĞ×ß¹ı        */
-        mouseTurnright();                                               /*  µçÄÔÊóÓÒ×ª                  */
+    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_R) &&         /*  ç”µè„‘é¼ çš„å³è¾¹æœ‰è·¯            */
+        (mazeBlockDataGet(MOUSERIGHT) == 0x00)) {                       /*  ç”µè„‘é¼ çš„å³è¾¹æ²¡æœ‰èµ°è¿‡        */
+        mouseTurnright();                                               /*  ç”µè„‘é¼ å³è½¬                  */
         return;
     }
-    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_L) &&         /*  µçÄÔÊóµÄ×ó±ßÓĞÂ·            */
-        (mazeBlockDataGet(MOUSELEFT ) == 0x00)) {                       /*  µçÄÔÊóµÄ×ó±ßÃ»ÓĞ×ß¹ı        */
-        mouseTurnleft();                                                /*  µçÄÔÊó×ó×ª                  */
+    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_L) &&         /*  ç”µè„‘é¼ çš„å·¦è¾¹æœ‰è·¯            */
+        (mazeBlockDataGet(MOUSELEFT ) == 0x00)) {                       /*  ç”µè„‘é¼ çš„å·¦è¾¹æ²¡æœ‰èµ°è¿‡        */
+        mouseTurnleft();                                                /*  ç”µè„‘é¼ å·¦è½¬                  */
         return;
     }
 }
 /*********************************************************************************************************
 ** Function name:       frontLeftMethod
-** Descriptions:        ÖĞ×ó·¨Ôò£¬ÓÅÏÈÏòÇ°ÔËĞĞ£¬Æä´ÎÏò×ó
-** input parameters:    ÎŞ
-** output parameters:   ÎŞ
-** Returned value:      ÎŞ
+** Descriptions:        ä¸­å·¦æ³•åˆ™ï¼Œä¼˜å…ˆå‘å‰è¿è¡Œï¼Œå…¶æ¬¡å‘å·¦
+** input parameters:    æ— 
+** output parameters:   æ— 
+** Returned value:      æ— 
 *********************************************************************************************************/
 void frontLeftMethod (void)
 {
-    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_F) &&         /*  µçÄÔÊóµÄÇ°·½ÓĞÂ·            */
-        (mazeBlockDataGet(MOUSEFRONT) == 0x00)) {                       /*  µçÄÔÊóµÄÇ°·½Ã»ÓĞ×ß¹ı        */
-        return;                                                         /*  µçÄÔÊó²»ÓÃ×ªÍä              */
+    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_F) &&         /*  ç”µè„‘é¼ çš„å‰æ–¹æœ‰è·¯            */
+        (mazeBlockDataGet(MOUSEFRONT) == 0x00)) {                       /*  ç”µè„‘é¼ çš„å‰æ–¹æ²¡æœ‰èµ°è¿‡        */
+        return;                                                         /*  ç”µè„‘é¼ ä¸ç”¨è½¬å¼¯              */
     }
-    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_L) &&         /*  µçÄÔÊóµÄ×ó±ßÓĞÂ·            */
-        (mazeBlockDataGet(MOUSELEFT ) == 0x00)) {                       /*  µçÄÔÊóµÄ×ó±ßÃ»ÓĞ×ß¹ı        */
-        mouseTurnleft();                                                /*  µçÄÔÊó×ó×ª                  */
+    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_L) &&         /*  ç”µè„‘é¼ çš„å·¦è¾¹æœ‰è·¯            */
+        (mazeBlockDataGet(MOUSELEFT ) == 0x00)) {                       /*  ç”µè„‘é¼ çš„å·¦è¾¹æ²¡æœ‰èµ°è¿‡        */
+        mouseTurnleft();                                                /*  ç”µè„‘é¼ å·¦è½¬                  */
         return;
     }
-    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_R) &&         /*  µçÄÔÊóµÄÓÒ±ßÓĞÂ·            */
-        (mazeBlockDataGet(MOUSERIGHT) == 0x00)) {                       /*  µçÄÔÊóµÄÓÒ±ßÃ»ÓĞ×ß¹ı        */
-        mouseTurnright();                                               /*  µçÄÔÊóÓÒ×ª                  */
+    if ((GucMapBlock[GmcMouse.cX][GmcMouse.cY] & MOUSEWAY_R) &&         /*  ç”µè„‘é¼ çš„å³è¾¹æœ‰è·¯            */
+        (mazeBlockDataGet(MOUSERIGHT) == 0x00)) {                       /*  ç”µè„‘é¼ çš„å³è¾¹æ²¡æœ‰èµ°è¿‡        */
+        mouseTurnright();                                               /*  ç”µè„‘é¼ å³è½¬                  */
         return;
     }
 }
 /*********************************************************************************************************
 ** Function name:       centralMethod
-** Descriptions:        ÖĞĞÄ·¨Ôò£¬¸ù¾İµçÄÔÊóÄ¿Ç°ÔÚÃÔ¹¬ÖĞËù´¦µÄÎ»ÖÃ¾õ¶¨Ê¹ÓÃºÎÖÖËÑË÷·¨Ôò
-** input parameters:    ÎŞ
-** output parameters:   ÎŞ
-** Returned value:      ÎŞ
+** Descriptions:        ä¸­å¿ƒæ³•åˆ™ï¼Œæ ¹æ®ç”µè„‘é¼ ç›®å‰åœ¨è¿·å®«ä¸­æ‰€å¤„çš„ä½ç½®è§‰å®šä½¿ç”¨ä½•ç§æœç´¢æ³•åˆ™
+** input parameters:    æ— 
+** output parameters:   æ— 
+** Returned value:      æ— 
 *********************************************************************************************************/
 void centralMethod (void)
 {
@@ -443,24 +467,24 @@ void centralMethod (void)
         if (GmcMouse.cY & 0x08) {
 
             /*
-             *  ´ËÊ±µçÄÔÊóÔÚÃÔ¹¬µÄÓÒÉÏ½Ç
+             *  æ­¤æ—¶ç”µè„‘é¼ åœ¨è¿·å®«çš„å³ä¸Šè§’
              */ 
             switch (GucMouseDir) {
                 
-            case UP:                                                    /*  µ±Ç°µçÄÔÊóÏòÉÏ              */
-                leftMethod();                                           /*  ×óÊÖ·¨Ôò                    */
+            case UP:                                                    /*  å½“å‰ç”µè„‘é¼ å‘ä¸Š              */
+                leftMethod();                                           /*  å·¦æ‰‹æ³•åˆ™                    */
                 break;
 
-            case RIGHT:                                                 /*  µ±Ç°µçÄÔÊóÏòÓÒ              */
-                rightMethod();                                          /*  ÓÒÊÖ·¨Ôò                    */
+            case RIGHT:                                                 /*  å½“å‰ç”µè„‘é¼ å‘å³              */
+                rightMethod();                                          /*  å³æ‰‹æ³•åˆ™                    */
                 break;
 
-            case DOWN:                                                  /*  µ±Ç°µçÄÔÊóÏòÏÂ              */
-                frontRightMethod();                                     /*  ÖĞÓÒ·¨Ôò                    */
+            case DOWN:                                                  /*  å½“å‰ç”µè„‘é¼ å‘ä¸‹              */
+                frontRightMethod();                                     /*  ä¸­å³æ³•åˆ™                    */
                 break;
 
-            case LEFT:                                                  /*  µ±Ç°µçÄÔÊóÏò×ó              */
-                frontLeftMethod();                                      /*  ÖĞ×ó·¨Ôò                    */
+            case LEFT:                                                  /*  å½“å‰ç”µè„‘é¼ å‘å·¦              */
+                frontLeftMethod();                                      /*  ä¸­å·¦æ³•åˆ™                    */
                 break;
 
             default:
@@ -469,24 +493,24 @@ void centralMethod (void)
         } else {
 
             /*
-             *  ´ËÊ±µçÄÔÊóÔÚÃÔ¹¬µÄÓÒÏÂ½Ç
+             *  æ­¤æ—¶ç”µè„‘é¼ åœ¨è¿·å®«çš„å³ä¸‹è§’
              */    
             switch (GucMouseDir) {
                 
-            case UP:                                                    /*  µ±Ç°µçÄÔÊóÏòÉÏ              */
-                frontLeftMethod();                                      /*  ÖĞ×ó·¨Ôò                    */
+            case UP:                                                    /*  å½“å‰ç”µè„‘é¼ å‘ä¸Š              */
+                frontLeftMethod();                                      /*  ä¸­å·¦æ³•åˆ™                    */
                 break;
 
-            case RIGHT:                                                 /*  µ±Ç°µçÄÔÊóÏòÓÒ              */
-                leftMethod();                                           /*  ×óÊÖ·¨Ôò                    */
+            case RIGHT:                                                 /*  å½“å‰ç”µè„‘é¼ å‘å³              */
+                leftMethod();                                           /*  å·¦æ‰‹æ³•åˆ™                    */
                 break;
 
-            case DOWN:                                                  /*  µ±Ç°µçÄÔÊóÏòÏÂ              */
-                rightMethod();                                          /*  ÓÒÊÖ·¨Ôò                    */
+            case DOWN:                                                  /*  å½“å‰ç”µè„‘é¼ å‘ä¸‹              */
+                rightMethod();                                          /*  å³æ‰‹æ³•åˆ™                    */
                 break;
 
-            case LEFT:                                                  /*  µ±Ç°µçÄÔÊóÏò×ó              */
-                frontRightMethod();                                     /*  ÖĞÓÒ·¨Ôò                    */
+            case LEFT:                                                  /*  å½“å‰ç”µè„‘é¼ å‘å·¦              */
+                frontRightMethod();                                     /*  ä¸­å³æ³•åˆ™                    */
                 break;
 
             default:
@@ -497,24 +521,24 @@ void centralMethod (void)
         if (GmcMouse.cY & 0x08) {
 
             /*
-             *  ´ËÊ±µçÄÔÊóÔÚÃÔ¹¬µÄ×óÉÏ½Ç
+             *  æ­¤æ—¶ç”µè„‘é¼ åœ¨è¿·å®«çš„å·¦ä¸Šè§’
              */    
             switch (GucMouseDir) {
                 
-            case UP:                                                    /*  µ±Ç°µçÄÔÊóÏòÉÏ              */
-                rightMethod();                                          /*  ÓÒÊÖ·¨Ôò                    */
+            case UP:                                                    /*  å½“å‰ç”µè„‘é¼ å‘ä¸Š              */
+                rightMethod();                                          /*  å³æ‰‹æ³•åˆ™                    */
                 break;
 
-            case RIGHT:                                                 /*  µ±Ç°µçÄÔÊóÏòÓÒ              */
-                frontRightMethod();                                     /*  ÖĞÓÒ·¨Ôò                    */
+            case RIGHT:                                                 /*  å½“å‰ç”µè„‘é¼ å‘å³              */
+                frontRightMethod();                                     /*  ä¸­å³æ³•åˆ™                    */
                 break;
 
-            case DOWN:                                                  /*  µ±Ç°µçÄÔÊóÏòÏÂ              */
-                frontLeftMethod();                                      /*  ÖĞ×ó·¨Ôò                    */
+            case DOWN:                                                  /*  å½“å‰ç”µè„‘é¼ å‘ä¸‹              */
+                frontLeftMethod();                                      /*  ä¸­å·¦æ³•åˆ™                    */
                 break;
 
-            case LEFT:                                                  /*  µ±Ç°µçÄÔÊóÏò×ó              */
-                leftMethod();                                           /*  ×óÊÖ·¨Ôò                    */
+            case LEFT:                                                  /*  å½“å‰ç”µè„‘é¼ å‘å·¦              */
+                leftMethod();                                           /*  å·¦æ‰‹æ³•åˆ™                    */
                 break;
 
             default:
@@ -523,24 +547,24 @@ void centralMethod (void)
         } else {
 
             /*
-             *  ´ËÊ±µçÄÔÊóÔÚÃÔ¹¬µÄ×óÏÂ½Ç
+             *  æ­¤æ—¶ç”µè„‘é¼ åœ¨è¿·å®«çš„å·¦ä¸‹è§’
              */    
             switch (GucMouseDir) {
                 
-            case UP:                                                    /*  µ±Ç°µçÄÔÊóÏòÉÏ              */
-                frontRightMethod();                                     /*  ÖĞÓÒ·¨Ôò                    */
+            case UP:                                                    /*  å½“å‰ç”µè„‘é¼ å‘ä¸Š              */
+                frontRightMethod();                                     /*  ä¸­å³æ³•åˆ™                    */
                 break;
 
-            case RIGHT:                                                 /*  µ±Ç°µçÄÔÊóÏòÓÒ              */
-                frontLeftMethod();                                      /*  ÖĞ×ó·¨Ôò                    */
+            case RIGHT:                                                 /*  å½“å‰ç”µè„‘é¼ å‘å³              */
+                frontLeftMethod();                                      /*  ä¸­å·¦æ³•åˆ™                    */
                 break;
 
-            case DOWN:                                                  /*  µ±Ç°µçÄÔÊóÏòÏÂ              */
-                leftMethod();                                           /*  ×óÊÖ·¨Ôò                    */
+            case DOWN:                                                  /*  å½“å‰ç”µè„‘é¼ å‘ä¸‹              */
+                leftMethod();                                           /*  å·¦æ‰‹æ³•åˆ™                    */
                 break;
 
-            case LEFT:                                                  /*  µ±Ç°µçÄÔÊóÏò×ó              */
-                rightMethod();                                          /*  ÓÒÊÖ·¨Ôò                    */
+            case LEFT:                                                  /*  å½“å‰ç”µè„‘é¼ å‘å·¦              */
+                rightMethod();                                          /*  å³æ‰‹æ³•åˆ™                    */
                 break;
 
             default:
@@ -551,39 +575,39 @@ void centralMethod (void)
 }
 /*********************************************************************************************************
 ** Function name:       crosswayCheck
-** Descriptions:        Í³¼ÆÄ³×ø±ê´æÔÚ»¹Î´×ß¹ıµÄÖ§Â·Êı
-** input parameters:    ucX£¬ĞèÒª¼ì²âµãµÄºá×ø±ê
-**                      ucY£¬ĞèÒª¼ì²âµãµÄ×İ×ø±ê
-** output parameters:   ÎŞ
-** Returned value:      ucCt£¬Î´×ß¹ıµÄÖ§Â·Êı
+** Descriptions:        ç»Ÿè®¡æŸåæ ‡å­˜åœ¨è¿˜æœªèµ°è¿‡çš„æ”¯è·¯æ•°
+** input parameters:    ucXï¼Œéœ€è¦æ£€æµ‹ç‚¹çš„æ¨ªåæ ‡
+**                      ucYï¼Œéœ€è¦æ£€æµ‹ç‚¹çš„çºµåæ ‡
+** output parameters:   æ— 
+** Returned value:      ucCtï¼Œæœªèµ°è¿‡çš„æ”¯è·¯æ•°
 *********************************************************************************************************/
 uchar crosswayCheck (char  cX, char  cY)
 {
     uchar ucCt = 0;
-    if ((GucMapBlock[cX][cY] & 0x01) &&                                 /*  ¾ø¶Ô·½Ïò£¬ÃÔ¹¬ÉÏ·½ÓĞÂ·      */
-        (GucMapBlock[cX][cY + 1]) == 0x00) {                            /*  ¾ø¶Ô·½Ïò£¬ÃÔ¹¬ÉÏ·½Î´×ß¹ı    */
-        ucCt++;                                                         /*  ¿ÉÇ°½ø·½ÏòÊı¼Ó1             */
+    if ((GucMapBlock[cX][cY] & 0x01) &&                                 /*  ç»å¯¹æ–¹å‘ï¼Œè¿·å®«ä¸Šæ–¹æœ‰è·¯      */
+        (GucMapBlock[cX][cY + 1]) == 0x00) {                            /*  ç»å¯¹æ–¹å‘ï¼Œè¿·å®«ä¸Šæ–¹æœªèµ°è¿‡    */
+        ucCt++;                                                         /*  å¯å‰è¿›æ–¹å‘æ•°åŠ 1             */
     }
-    if ((GucMapBlock[cX][cY] & 0x02) &&                                 /*  ¾ø¶Ô·½Ïò£¬ÃÔ¹¬ÓÒ·½ÓĞÂ·      */
-        (GucMapBlock[cX + 1][cY]) == 0x00) {                            /*  ¾ø¶Ô·½Ïò£¬ÃÔ¹¬ÓÒ·½Ã»ÓĞ×ß¹ı  */
-        ucCt++;                                                         /*  ¿ÉÇ°½ø·½ÏòÊı¼Ó1             */
+    if ((GucMapBlock[cX][cY] & 0x02) &&                                 /*  ç»å¯¹æ–¹å‘ï¼Œè¿·å®«å³æ–¹æœ‰è·¯      */
+        (GucMapBlock[cX + 1][cY]) == 0x00) {                            /*  ç»å¯¹æ–¹å‘ï¼Œè¿·å®«å³æ–¹æ²¡æœ‰èµ°è¿‡  */
+        ucCt++;                                                         /*  å¯å‰è¿›æ–¹å‘æ•°åŠ 1             */
     }
-    if ((GucMapBlock[cX][cY] & 0x04) &&                                 /*  ¾ø¶Ô·½Ïò£¬ÃÔ¹¬ÏÂ·½ÓĞÂ·      */
-        (GucMapBlock[cX][cY - 1]) == 0x00) {                            /*  ¾ø¶Ô·½Ïò£¬ÃÔ¹¬ÏÂ·½Î´×ß¹ı    */
-        ucCt++;                                                         /*  ¿ÉÇ°½ø·½ÏòÊı¼Ó1             */
+    if ((GucMapBlock[cX][cY] & 0x04) &&                                 /*  ç»å¯¹æ–¹å‘ï¼Œè¿·å®«ä¸‹æ–¹æœ‰è·¯      */
+        (GucMapBlock[cX][cY - 1]) == 0x00) {                            /*  ç»å¯¹æ–¹å‘ï¼Œè¿·å®«ä¸‹æ–¹æœªèµ°è¿‡    */
+        ucCt++;                                                         /*  å¯å‰è¿›æ–¹å‘æ•°åŠ 1             */
     }
-    if ((GucMapBlock[cX][cY] & 0x08) &&                                 /*  ¾ø¶Ô·½Ïò£¬ÃÔ¹¬×ó·½ÓĞÂ·      */
-        (GucMapBlock[cX - 1][cY]) == 0x00) {                            /*  ¾ø¶Ô·½Ïò£¬ÃÔ¹¬×ó·½Î´×ß¹ı    */
-        ucCt++;                                                         /*  ¿ÉÇ°½ø·½ÏòÊı¼Ó1             */
+    if ((GucMapBlock[cX][cY] & 0x08) &&                                 /*  ç»å¯¹æ–¹å‘ï¼Œè¿·å®«å·¦æ–¹æœ‰è·¯      */
+        (GucMapBlock[cX - 1][cY]) == 0x00) {                            /*  ç»å¯¹æ–¹å‘ï¼Œè¿·å®«å·¦æ–¹æœªèµ°è¿‡    */
+        ucCt++;                                                         /*  å¯å‰è¿›æ–¹å‘æ•°åŠ 1             */
     }
     return ucCt;
 }
 /*********************************************************************************************************
 ** Function name:       crosswayChoice
-** Descriptions:        Ñ¡ÔñÒ»ÌõÖ§Â·×÷ÎªÇ°½ø·½Ïò
-** input parameters:    ÎŞ
-** output parameters:   ÎŞ
-** Returned value:      ÎŞ
+** Descriptions:        é€‰æ‹©ä¸€æ¡æ”¯è·¯ä½œä¸ºå‰è¿›æ–¹å‘
+** input parameters:    æ— 
+** output parameters:   æ— 
+** Returned value:      æ— 
 *********************************************************************************************************/
 void crosswayChoice (void)
 {
@@ -615,44 +639,44 @@ void crosswayChoice (void)
 }
 /*********************************************************************************************************
 ** Function name:       main
-** Descriptions:        Ö÷º¯Êı
-** input parameters:    ÎŞ
-** output parameters:   ÎŞ
-** Returned value:      ÎŞ
+** Descriptions:        ä¸»å‡½æ•°
+** input parameters:    æ— 
+** output parameters:   æ— 
+** Returned value:      æ— 
 *********************************************************************************************************/
 main (void)
 {
-    uchar n          = 0;                                               /*  GmcCrossway[]ÏÂ±ê           */
-    uchar ucRoadStat = 0;                                               /*  Í³¼ÆÄ³Ò»×ø±ê¿ÉÇ°½øµÄÖ§Â·Êı  */
-    uchar ucTemp     = 0;                                               /*  ÓÃÓÚSTART×´Ì¬ÖĞ×ø±ê×ª»»     */
+    uchar n          = 0;                                               /*  GmcCrossway[]ä¸‹æ ‡           */
+    uchar ucRoadStat = 0;                                               /*  ç»Ÿè®¡æŸä¸€åæ ‡å¯å‰è¿›çš„æ”¯è·¯æ•°  */
+    uchar ucTemp     = 0;                                               /*  ç”¨äºSTARTçŠ¶æ€ä¸­åæ ‡è½¬æ¢     */
 
-    mouseInit();                                                        /*  µ×²ãÇı¶¯µÄ³õÊ¼»¯            */
-    Init_7289();                                                      /*  ÏÔÊ¾Ä£¿é³õÊ¼»¯              */
+    mouseInit();                                                        /*  åº•å±‚é©±åŠ¨çš„åˆå§‹åŒ–            */
+    Init_7289();                                                      /*  æ˜¾ç¤ºæ¨¡å—åˆå§‹åŒ–              */
 
     while (1) {
-        switch (GucMouseTask) {                                         /*  ×´Ì¬»ú´¦Àí                  */
+        switch (GucMouseTask) {                                         /*  çŠ¶æ€æœºå¤„ç†                  */
             
         case WAIT:
             sensorDebug();
             voltageDetect();
             delay(100000);
-            if (keyCheck() == true) {                                   /*  ¼ì²â°´¼üµÈ´ıÆô¶¯            */
-                Reset_7289();                                         /*  ¸´Î»ZLG7289                 */
+            if (keyCheck() == true) {                                   /*  æ£€æµ‹æŒ‰é”®ç­‰å¾…å¯åŠ¨            */
+                Reset_7289();                                         /*  å¤ä½ZLG7289                 */
                 GucMouseTask = START;
             }
             break;
             
-        case START:                                                     /*  ÅĞ¶ÏµçÄÔÊóÆğµãµÄºá×ø±ê      */
-            mazeSearch();                                               /*  ÏòÇ°ËÑË÷                    */
-            if (GucMapBlock[GmcMouse.cX][GmcMouse.cY] & 0x08) {         /*  ÅĞ¶ÏµçÀÏÊó×ó±ßÊÇ·ñ´æÔÚ³ö¿Ú  */
-                if (MAZETYPE == 8) {                                    /*  ĞŞ¸ÄËÄ·ÖÖ®Ò»ÃÔ¹¬µÄÖÕµã×ø±ê  */
+        case START:                                                     /*  åˆ¤æ–­ç”µè„‘é¼ èµ·ç‚¹çš„æ¨ªåæ ‡      */
+            mazeSearch();                                               /*  å‘å‰æœç´¢                    */
+            if (GucMapBlock[GmcMouse.cX][GmcMouse.cY] & 0x08) {         /*  åˆ¤æ–­ç”µè€é¼ å·¦è¾¹æ˜¯å¦å­˜åœ¨å‡ºå£  */
+                if (MAZETYPE == 8) {                                    /*  ä¿®æ”¹å››åˆ†ä¹‹ä¸€è¿·å®«çš„ç»ˆç‚¹åæ ‡  */
                     GucXGoal0 = 1;
                     GucXGoal1 = 0;
                 }
-                GucXStart   = MAZETYPE - 1;                             /*  ĞŞ¸ÄµçÄÔÊóÆğµãµÄºá×ø±ê      */
-                GmcMouse.cX = MAZETYPE - 1;                             /*  ĞŞ¸ÄµçÄÔÊóµ±Ç°Î»ÖÃµÄºá×ø±ê  */    
+                GucXStart   = MAZETYPE - 1;                             /*  ä¿®æ”¹ç”µè„‘é¼ èµ·ç‚¹çš„æ¨ªåæ ‡      */
+                GmcMouse.cX = MAZETYPE - 1;                             /*  ä¿®æ”¹ç”µè„‘é¼ å½“å‰ä½ç½®çš„æ¨ªåæ ‡  */    
                 /*
-                 *  ÓÉÓÚÄ¬ÈÏµÄÆğµãÎª(0,0)£¬ÏÖÔÚĞèÒª°ÑÒÑ¼ÇÂ¼µÄÇ½±Ú×ÊÁÏ×ª»»¹ıÀ´
+                 *  ç”±äºé»˜è®¤çš„èµ·ç‚¹ä¸º(0,0)ï¼Œç°åœ¨éœ€è¦æŠŠå·²è®°å½•çš„å¢™å£èµ„æ–™è½¬æ¢è¿‡æ¥
                  */
                 ucTemp = GmcMouse.cY;
                 do {
@@ -660,21 +684,21 @@ main (void)
                     GucMapBlock[0 ][ucTemp] = 0;
                 }while (ucTemp--);
                 /*
-                 *  ÔÚOFFSHOOT[0]ÖĞ±£´æÆğµã×ø±ê
+                 *  åœ¨OFFSHOOT[0]ä¸­ä¿å­˜èµ·ç‚¹åæ ‡
                  */
                 GmcCrossway[n].cX = MAZETYPE - 1;
                 GmcCrossway[n].cY = 0;
                 n++;
-                GucMouseTask = MAZESEARCH;                              /*  ×´Ì¬×ª»»ÎªËÑÑ°×´Ì¬          */
+                GucMouseTask = MAZESEARCH;                              /*  çŠ¶æ€è½¬æ¢ä¸ºæœå¯»çŠ¶æ€          */
             }
-            if (GucMapBlock[GmcMouse.cX][GmcMouse.cY] & 0x02) {         /*  ÅĞ¶ÏµçÀÏÊóÓÒ±ßÊÇ·ñ´æÔÚ³ö¿Ú  */
+            if (GucMapBlock[GmcMouse.cX][GmcMouse.cY] & 0x02) {         /*  åˆ¤æ–­ç”µè€é¼ å³è¾¹æ˜¯å¦å­˜åœ¨å‡ºå£  */
                 /*
-                 *  ÔÚOFFSHOOT[0]ÖĞ±£´æÆğµã×ø±ê
+                 *  åœ¨OFFSHOOT[0]ä¸­ä¿å­˜èµ·ç‚¹åæ ‡
                  */
                 GmcCrossway[n].cX = 0;
                 GmcCrossway[n].cY = 0;
                 n++;
-                GucMouseTask = MAZESEARCH;                              /*  ×´Ì¬×ª»»ÎªËÑÑ°×´Ì¬          */
+                GucMouseTask = MAZESEARCH;                              /*  çŠ¶æ€è½¬æ¢ä¸ºæœå¯»çŠ¶æ€          */
             }
             break;
             
@@ -689,24 +713,24 @@ main (void)
              break;
           }          
           else{
-            ucRoadStat = crosswayCheck(GmcMouse.cX,GmcMouse.cY);        /*  Í³¼Æ¿ÉÇ°½øµÄÖ§Â·Êı          */
+            ucRoadStat = crosswayCheck(GmcMouse.cX,GmcMouse.cY);        /*  ç»Ÿè®¡å¯å‰è¿›çš„æ”¯è·¯æ•°          */
             if (ucRoadStat) 
-            {                                                           /*  ÓĞ¿ÉÇ°½ø·½Ïò                */
-                if (ucRoadStat > 1) {                                   /*  ÓĞ¶àÌõ¿ÉÇ°½ø·½Ïò£¬±£´æ×ø±ê  */
+            {                                                           /*  æœ‰å¯å‰è¿›æ–¹å‘                */
+                if (ucRoadStat > 1) {                                   /*  æœ‰å¤šæ¡å¯å‰è¿›æ–¹å‘ï¼Œä¿å­˜åæ ‡  */
                     GmcCrossway[n].cX = GmcMouse.cX;
                     GmcCrossway[n].cY = GmcMouse.cY;
                     n++;
                 }
-                crosswayChoice();                                       /*  ÓÃÓÒÊÖ·¨ÔòËÑË÷Ñ¡ÔñÇ°½ø·½Ïò  */
-                mazeSearch();                                           /*  Ç°½øÒ»¸ñ                    */
+                crosswayChoice();                                       /*  ç”¨å³æ‰‹æ³•åˆ™æœç´¢é€‰æ‹©å‰è¿›æ–¹å‘  */
+                mazeSearch();                                           /*  å‰è¿›ä¸€æ ¼                    */
             } 
                else if(ucRoadStat==1)
               {
-                  crosswayChoice();                                       /*  ÓÃÓÒÊÖ·¨ÔòËÑË÷Ñ¡ÔñÇ°½ø·½Ïò  */
+                  crosswayChoice();                                       /*  ç”¨å³æ‰‹æ³•åˆ™æœç´¢é€‰æ‹©å‰è¿›æ–¹å‘  */
                   mazeSearch();
               }
               else 
-             {                                                    /*  Ã»ÓĞ¿ÉÇ°½ø·½Ïò£¬»Øµ½×î½üÖ§Â·*/
+             {                                                    /*  æ²¡æœ‰å¯å‰è¿›æ–¹å‘ï¼Œå›åˆ°æœ€è¿‘æ”¯è·¯*/
                 mouseTurnback();
                 n=n-1;
                 objectGoTo(GmcCrossway[n].cX,GmcCrossway[n].cY);
@@ -724,9 +748,9 @@ main (void)
             break;
 
         case SPURT:
-            mouseSpurt();                                               /*  ÒÔ×îÓÅÂ·¾¶³åÏòÖÕµã          */
-            objectGoTo(GucXStart,GucYStart);                            /*  »Øµ½Æğµã                    */
-            mouseTurnback();                                            /*  Ïòºó×ª£¬»Ö¸´³ö·¢×ËÊÆ        */
+            mouseSpurt();                                               /*  ä»¥æœ€ä¼˜è·¯å¾„å†²å‘ç»ˆç‚¹          */
+            objectGoTo(GucXStart,GucYStart);                            /*  å›åˆ°èµ·ç‚¹                    */
+            mouseTurnback();                                            /*  å‘åè½¬ï¼Œæ¢å¤å‡ºå‘å§¿åŠ¿        */
             while (1) {
                 if (keyCheck() == true) {
                     break;
@@ -746,3 +770,4 @@ main (void)
 /*********************************************************************************************************
   END FILE
 *********************************************************************************************************/
+
