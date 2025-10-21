@@ -5,7 +5,7 @@
 
 
 /*********************************************************************************************************
-  °üº¬Í·ÎÄ¼ş
+  åŒ…å«å¤´æ–‡ä»¶
 *********************************************************************************************************/
 #include "drive_7289.h"
 #include "Type.h"
@@ -14,38 +14,38 @@
 
 
 /*********************************************************************************************************
-  ³£Á¿ºê¶¨Òå -- ¶¨ÒåµçÄÔÊóµÄËÄÖÖ×´Ì¬
+  å¸¸é‡å®å®šä¹‰ -- å®šä¹‰ç”µè„‘é¼ çš„å››ç§çŠ¶æ€
 *********************************************************************************************************/
-#define  WAIT           0                                               /*  µÈ´ı×´Ì¬                    */
-#define  START          1                                               /*  Æô¶¯×´Ì¬                    */
-#define  MAZESEARCH     2                                               /*  ËÑÑ°×´Ì¬                    */
-#define  SPURT          3                                               /*  ³å´Ì×´Ì¬                    */
+#define  WAIT           0                                               /*  ç­‰å¾…çŠ¶æ€                    */
+#define  START          1                                               /*  å¯åŠ¨çŠ¶æ€                    */
+#define  MAZESEARCH     2                                               /*  æœå¯»çŠ¶æ€                    */
+#define  SPURT          3                                               /*  å†²åˆºçŠ¶æ€                    */
 
 
 /*********************************************************************************************************
-  ÉêÃ÷ĞèÒªÊ¹ÓÃµÄÍâ²¿º¯Êı
+  ç”³æ˜éœ€è¦ä½¿ç”¨çš„å¤–éƒ¨å‡½æ•°
 *********************************************************************************************************/
-extern void  mouseInit(void);                                           /*  µ×²ãÇı¶¯³ÌĞò³õÊ¼»¯          */
-extern void  mouseGoahead(char  cNBlock);                               /*  Ç°½øN¸ñ                     */
-extern void  mazeSearch(void);                                          /*  ÃÔ¹¬ËÑË÷                    */
-extern void  mouseTurnleft(void);                                       /*  Ïò×ó×ª90¶È                  */
-extern void  mouseTurnright(void);                                      /*  ÏòÓÒ×ª90¶È                  */
-extern void  mouseTurnback(void);                                       /*  Ïòºó×ª                      */
-extern uchar keyCheck(void);                                            /*  ¼ì²â°´¼ü                    */
-extern void  sensorDebug(void);                                         /*  ´«¸ĞÆ÷µ÷ÊÔ                  */
-extern void  voltageDetect(void);                                       /*  µçÑ¹¼à²â                    */
+extern void  mouseInit(void);                                           /*  åº•å±‚é©±åŠ¨ç¨‹åºåˆå§‹åŒ–          */
+extern void  mouseGoahead(char  cNBlock);                               /*  å‰è¿›Næ ¼                     */
+extern void  mazeSearch(void);                                          /*  è¿·å®«æœç´¢                    */
+extern void  mouseTurnleft(void);                                       /*  å‘å·¦è½¬90åº¦                  */
+extern void  mouseTurnright(void);                                      /*  å‘å³è½¬90åº¦                  */
+extern void  mouseTurnback(void);                                       /*  å‘åè½¬                      */
+extern uchar keyCheck(void);                                            /*  æ£€æµ‹æŒ‰é”®                    */
+extern void  sensorDebug(void);                                         /*  ä¼ æ„Ÿå™¨è°ƒè¯•                  */
+extern void  voltageDetect(void);                                       /*  ç”µå‹ç›‘æµ‹                    */
 
 /*********************************************************************************************************
-  ÉêÃ÷ĞèÒªÊ¹ÓÃµÄÍâ²¿±äÁ¿
+  ç”³æ˜éœ€è¦ä½¿ç”¨çš„å¤–éƒ¨å˜é‡
 *********************************************************************************************************/
-extern MAZECOOR GmcMouse;                                               /*  GmcMouse.x :µçÄÔÊóºá×ø±ê    */
-                                                                        /*  GmcMouse.y :µçÄÔÊó×İ×ø±ê    */
+extern MAZECOOR GmcMouse;                                               /*  GmcMouse.x :ç”µè„‘é¼ æ¨ªåæ ‡    */
+                                                                        /*  GmcMouse.y :ç”µè„‘é¼ çºµåæ ‡    */
                                                                         
-extern uchar    GucMouseDir;                                            /*  µçÄÔÊóµÄÇ°½ø·½Ïò            */
+extern uchar    GucMouseDir;                                            /*  ç”µè„‘é¼ çš„å‰è¿›æ–¹å‘            */
 extern uchar    GucMapBlock[MAZETYPE][MAZETYPE];                        /*  GucMapBlock[x][y]           */
-                                                                        /*  x,ºá×ø±ê;y,×İ×ø±ê;          */
-                                                                        /*  bit3~bit0·Ö±ğ´ú±í×óÏÂÓÒÉÏ   */
-                                                                        /*  0:¸Ã·½ÏòÎŞÂ·£¬1:¸Ã·½ÏòÓĞÂ·  */
+                                                                        /*  x,æ¨ªåæ ‡;y,çºµåæ ‡;          */
+                                                                        /*  bit3~bit0åˆ†åˆ«ä»£è¡¨å·¦ä¸‹å³ä¸Š   */
+                                                                        /*  0:è¯¥æ–¹å‘æ— è·¯ï¼Œ1:è¯¥æ–¹å‘æœ‰è·¯  */
 
 static void  mapStepEdit(char  cX, char  cY);
 static void  mouseSpurt(void);
@@ -59,6 +59,15 @@ static void  centralMethod(void);
 static void spurTrackChoice(void);
 
 
+
+// ... å…¶ä»–å£°æ˜ ...
+
+// A* ç›¸å…³å‡½æ•°å£°æ˜
+uchar findPathAStar(MAZECOOR start, MAZECOOR goal, MAZECOOR path[], int* pathLen);
+void followAStarPath(MAZECOOR path[], int pathLen);
+uint calculateHeuristic(char cX1, char cY1, char cX2, char cY2); // å¦‚æœæƒ³åœ¨å…¶ä»–æ–‡ä»¶è°ƒç”¨
+
+// ... å…¶ä»–å£°æ˜ ...
 #endif
 /*********************************************************************************************************
   END FILE
