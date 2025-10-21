@@ -954,19 +954,66 @@ main (void)
               }
               else 
              {                                                    /*  没有可前进方向，回到最近支路*/
-                mouseTurnback();
-                n=n-1;
-                objectGoTo(GmcCrossway[n].cX,GmcCrossway[n].cY);
-                
-                ucRoadStat = crosswayCheck(GmcMouse.cX,GmcMouse.cY);
-                if (ucRoadStat > 1) {
+                // main 函数中 MAZESEARCH 部分的修改示例 (回溯部分)
+case MAZESEARCH:
+    // ... (检查是否到达终点等逻辑保持不变) ...
+    else {
+        ucRoadStat = crosswayCheck(GmcMouse.cX, GmcMouse.cY);
+        if (ucRoadStat) {
+            // ... (处理有未探索路径的逻辑不变) ...
+             if (ucRoadStat > 1) {
+                GmcCrossway[n].cX = GmcMouse.cX;
+                GmcCrossway[n].cY = GmcMouse.cY;
+                n++;
+            }
+            crosswayChoice();
+            mazeSearch(); // 继续探索
+        } else { // 没有未探索的路径，需要回溯
+            //mouseTurnback(); // 原来的回溯可能只需要后转一下
+            if (n > 0) { // 确保堆栈中有回溯点
+                 n = n - 1;
+                 MAZECOOR backtrackGoal = GmcCrossway[n];
+                 MAZECOOR backtrackPath[OPEN_LIST_MAX_SIZE];
+                 int backtrackPathLen = 0;
+
+                 // 使用 A* 寻找回到最近岔路口的最短已知路径
+                 if (findPathAStar(GmcMouse, backtrackGoal, backtrackPath, &backtrackPathLen)) {
+                    followAStarPath(backtrackPath, backtrackPathLen); // 执行回溯路径
+                 } else {
+                     // 无法找到回溯路径，错误处理
+                     Download_7289(2, 0, 0, 0x4f); // 'E'
+                     while(1);
+                 }
+
+                 // 回到岔路口后，重新评估
+                 ucRoadStat = crosswayCheck(GmcMouse.cX, GmcMouse.cY);
+                 if (ucRoadStat > 1) { // 如果还有其他未探索路径，放回堆栈
                     GmcCrossway[n].cX = GmcMouse.cX;
                     GmcCrossway[n].cY = GmcMouse.cY;
-                    n++;     
-                } 
-                crosswayChoice();
-                mazeSearch();                            
+                    n++;
+                 }
+                 if (ucRoadStat > 0) { // 选择下一个探索方向并前进
+                    crosswayChoice();
+                    mazeSearch();
+                 } else if (n > 0) {
+                    // 如果回到岔路口后仍然没有出路 (理论上不应发生，除非地图记录错误或堆栈逻辑问题)，继续向上回溯
+                    // 可能需要添加一个循环或递归的回溯逻辑
+                 } else {
+                     // 堆栈空了，且当前位置无路可走，探索完成或陷入死区
+                     // 可以考虑返回起点或进入SPURT状态
+                     objectGoTo(GucXStart,GucYStart);
+                     mouseTurnback();
+                     GucMouseTask = SPURT; // 假设探索完成，进入冲刺
+                 }
+            } else {
+                 // 堆栈为空，且当前位置没有未探索路径，探索完成
+                 objectGoTo(GucXStart,GucYStart);
+                 mouseTurnback();
+                 GucMouseTask = SPURT; // 进入冲刺
             }
+        }
+    }
+    break;
           }
             break;
 
@@ -993,5 +1040,6 @@ main (void)
 /*********************************************************************************************************
   END FILE
 *********************************************************************************************************/
+
 
 
