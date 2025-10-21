@@ -57,7 +57,163 @@ uint calculateHeuristic(char cX1, char cY1, char cX2, char cY2) {
     uint dy = (cY1 > cY2) ? (cY1 - cY2) : (cY2 - cY1);
     // 假设移动一格的成本是 1
     return dx + dy;
-}   
+} 
+#include <stdlib.h> // 为了 abs 函数
+
+// --- 开放列表的辅助函数 (简化版，非优先队列) ---
+void addToOpenList(char cX, char cY) {
+    if (openListSize < OPEN_LIST_MAX_SIZE) {
+        openList[openListSize].cX = cX;
+        openList[openListSize].cY = cY;
+        openListSize++;
+        aStarNodes[cX][cY].onOpenList = TRUE;
+    }
+    // 实际应用中需要检查重复添加和处理边界情况
+}
+
+// 从开放列表中找到 fCost 最低的节点 (简化版，效率较低)
+MAZECOOR getLowestFCostNode() {
+    uint minFCost = UINT_MAX;
+    int minIndex = -1;
+    MAZECOOR node = {-1, -1}; // 无效坐标表示未找到
+
+    for (int i = 0; i < openListSize; ++i) {
+        char cx = openList[i].cX;
+        char cy = openList[i].cY;
+        if (aStarNodes[cx][cy].fCost < minFCost) {
+            minFCost = aStarNodes[cx][cy].fCost;
+            minIndex = i;
+        }
+    }
+
+    if (minIndex != -1) {
+        node = openList[minIndex];
+        // 从列表中移除 (将最后一个元素移到当前位置)
+        openList[minIndex] = openList[openListSize - 1];
+        openListSize--;
+        aStarNodes[node.cX][node.cY].onOpenList = FALSE; // 从开放列表移除标记
+    }
+    return node;
+}
+
+void removeFromOpenList(char cX, char cY) {
+     for (int i = 0; i < openListSize; ++i) {
+        if (openList[i].cX == cX && openList[i].cY == cY) {
+            openList[i] = openList[openListSize - 1];
+            openListSize--;
+            aStarNodes[cX][cY].onOpenList = FALSE;
+            break;
+        }
+    }
+}
+
+
+// A* 搜索主函数
+// 返回 TRUE 如果找到路径，FALSE 如果找不到
+// path 参数用于存储回溯后的路径 (需要调用者分配足够空间)
+// pathLen 返回路径长度
+uchar findPathAStar(MAZECOOR start, MAZECOOR goal, MAZECOOR path[], int* pathLen) {
+    int i, j;
+    char currentX, currentY;
+    MAZECOOR currentNode;
+
+    // 1. 初始化
+    openListSize = 0;
+    for (i = 0; i < MAZETYPE; ++i) {
+        for (j = 0; j < MAZETYPE; ++j) {
+            aStarNodes[i][j].parent.cX = -1; // 无效父节点
+            aStarNodes[i][j].parent.cY = -1;
+            aStarNodes[i][j].gCost = UINT_MAX;
+            aStarNodes[i][j].hCost = UINT_MAX;
+            aStarNodes[i][j].fCost = UINT_MAX;
+            aStarNodes[i][j].onOpenList = FALSE;
+            aStarNodes[i][j].onClosedList = FALSE;
+        }
+    }
+
+    // 2. 将起点加入开放列表
+    aStarNodes[start.cX][start.cY].gCost = 0;
+    aStarNodes[start.cX][start.cY].hCost = calculateHeuristic(start.cX, start.cY, goal.cX, goal.cY);
+    aStarNodes[start.cX][start.cY].fCost = aStarNodes[start.cX][start.cY].hCost;
+    addToOpenList(start.cX, start.cY);
+
+    // 3. 主循环
+    while (openListSize > 0) {
+        // 3.1 从开放列表取出 fCost 最低的节点
+        currentNode = getLowestFCostNode();
+        currentX = currentNode.cX;
+        currentY = currentNode.cY;
+
+        // 3.2 如果是目标节点，则找到路径
+        if (currentX == goal.cX && currentY == goal.cY) {
+            // 回溯路径
+            *pathLen = 0;
+            MAZECOOR temp = goal;
+            while (temp.cX != -1 && temp.cY != -1) {
+                 if (*pathLen < OPEN_LIST_MAX_SIZE) { // 防止数组越界
+                    path[*pathLen] = temp;
+                    (*pathLen)++;
+                    temp = aStarNodes[temp.cX][temp.cY].parent;
+                } else {
+                    // 路径太长，处理错误
+                    return FALSE;
+                }
+            }
+             // 翻转路径数组 (因为是从终点回溯的)
+            for (i = 0; i < (*pathLen) / 2; ++i) {
+                MAZECOOR swap = path[i];
+                path[i] = path[*pathLen - 1 - i];
+                path[*pathLen - 1 - i] = swap;
+            }
+            return TRUE; // 找到路径
+        }
+
+        // 3.3 将当前节点移到封闭列表
+        aStarNodes[currentX][currentY].onClosedList = TRUE;
+
+        // 3.4 检查所有邻居
+        int dx[] = {0, 1, 0, -1}; // 上, 右, 下, 左
+        int dy[] = {1, 0, -1, 0};
+        uchar walls[] = {0x01, 0x02, 0x04, 0x08}; // 对应方向的墙壁掩码 (上右下左)
+
+        for (i = 0; i < 4; ++i) {
+            // 检查是否有墙壁阻挡
+            if (GucMapBlock[currentX][currentY] & walls[i]) {
+                char neighborX = currentX + dx[i];
+                char neighborY = currentY + dy[i];
+
+                // 检查邻居是否在迷宫范围内且不是障碍物(这里简化，假设能走的就是通路)
+                if (neighborX >= 0 && neighborX < MAZETYPE && neighborY >= 0 && neighborY < MAZETYPE) {
+                    // 如果邻居已在封闭列表，跳过
+                    if (aStarNodes[neighborX][neighborY].onClosedList) {
+                        continue;
+                    }
+
+                    // 计算通过当前节点到达邻居的 gCost
+                    // 假设移动成本为 1
+                    uint tentativeGCost = aStarNodes[currentX][currentY].gCost + 1;
+
+                    // 如果这条路径更好，或者邻居不在开放列表
+                    if (tentativeGCost < aStarNodes[neighborX][neighborY].gCost || !aStarNodes[neighborX][neighborY].onOpenList) {
+                        // 更新邻居信息
+                        aStarNodes[neighborX][neighborY].parent = currentNode;
+                        aStarNodes[neighborX][neighborY].gCost = tentativeGCost;
+                        aStarNodes[neighborX][neighborY].hCost = calculateHeuristic(neighborX, neighborY, goal.cX, goal.cY);
+                        aStarNodes[neighborX][neighborY].fCost = aStarNodes[neighborX][neighborY].gCost + aStarNodes[neighborX][neighborY].hCost;
+
+                        // 如果邻居不在开放列表，则加入
+                        if (!aStarNodes[neighborX][neighborY].onOpenList) {
+                            addToOpenList(neighborX, neighborY);
+                        }
+                        // 注意：如果使用真正的优先队列，这里可能需要更新节点在队列中的位置
+                    }
+                }
+            }
+        }
+    }
+
+    return FALSE; // 未找到路径
+}
 /*********************************************************************************************************
 ** Function name:       mapStepEdit
 ** Descriptions:        制作以目标点为起点的等高图
@@ -158,47 +314,114 @@ void mapStepEdit (char  cX, char  cY)
  ** output parameters:  无
 ** Returned value:      无
 *********************************************************************************************************/
+// 新的函数：根据A*生成的路径移动老鼠
+void followAStarPath(MAZECOOR path[], int pathLen) {
+    if (pathLen <= 1) return; // 路径无效或已在终点
+
+    char cNBlock = 0; // 连续前进的格数
+    for (int i = 0; i < pathLen - 1; ++i) {
+        MAZECOOR current = path[i];
+        MAZECOOR next = path[i + 1];
+
+        // 计算需要移动的方向 (绝对方向)
+        char targetDir;
+        if (next.cY > current.cY) targetDir = UP;
+        else if (next.cX > current.cX) targetDir = RIGHT;
+        else if (next.cY < current.cY) targetDir = DOWN;
+        else if (next.cX < current.cX) targetDir = LEFT;
+        else continue; // 坐标相同，理论上不应发生
+
+        // 如果方向与当前方向不同，先执行之前的连续前进，再转弯
+        if (targetDir != GucMouseDir) {
+            if (cNBlock > 0) {
+                mouseGoahead(cNBlock); // 执行连续前进
+                cNBlock = 0;          // 重置计数
+            }
+            // 计算相对方向并转弯
+            char relativeDir = (targetDir + 4 - GucMouseDir) % 4;
+            switch (relativeDir) {
+                case 1: mouseTurnright(); break;
+                case 2: mouseTurnback(); break; // 理论上A*路径不会需要180度转弯
+                case 3: mouseTurnleft(); break;
+            }
+        }
+        // 方向相同，增加连续前进格数
+        cNBlock++;
+    }
+
+    // 执行最后一段连续前进
+    if (cNBlock > 0) {
+        mouseGoahead(cNBlock);
+    }
+     // 更新老鼠当前坐标（虽然 mouseGoahead 内部会更新，但确保最终位置正确）
+     if (pathLen > 0) {
+        GmcMouse = path[pathLen - 1];
+     }
+}
+
+// 修改 mouseSpurt 函数以使用 A*
 void mouseSpurt (void)
 {
     uchar ucTemp = 0xff;
-    char cXdst = 0,cYdst = 0;
-    /*
-     *  对终点的四个坐标分别制作等高图
-     *  取离起点最近的一个点作为目标点
-     */
-    if (GucMapBlock[GucXGoal0][GucYGoal0] & 0x0c) {                     /*  判断该终点坐标是否有出口    */
-        mapStepEdit(GucXGoal0,GucYGoal0);                               /*  制作等高图                  */
-        if (ucTemp > GucMapStep[GucXStart][GucYStart]) {                /*  保存离起点最近的坐标        */
-            cXdst  = GucXGoal0;
-            cYdst  = GucYGoal0;
-            ucTemp = GucMapStep[GucXStart][GucYStart];
+    char cXdst = -1, cYdst = -1;
+    MAZECOOR start = {GucXStart, GucYStart};
+    MAZECOOR goalCandidates[4];
+    int numGoalCandidates = 0;
+    MAZECOOR bestGoal = {-1, -1};
+    uint minCost = UINT_MAX;
+    MAZECOOR finalPath[OPEN_LIST_MAX_SIZE]; // 存储最终路径
+    int finalPathLen = 0;
+
+
+    // 确定所有可能的终点目标格
+    if (GucMapBlock[GucXGoal0][GucYGoal0] != 0) { goalCandidates[numGoalCandidates++] = (MAZECOOR){GucXGoal0, GucYGoal0}; }
+    if (GucMapBlock[GucXGoal0][GucYGoal1] != 0) { goalCandidates[numGoalCandidates++] = (MAZECOOR){GucXGoal0, GucYGoal1}; }
+    if (GucMapBlock[GucXGoal1][GucYGoal0] != 0) { goalCandidates[numGoalCandidates++] = (MAZECOOR){GucXGoal1, GucYGoal0}; }
+    if (GucMapBlock[GucXGoal1][GucYGoal1] != 0) { goalCandidates[numGoalCandidates++] = (MAZECOOR){GucXGoal1, GucYGoal1}; }
+
+    // 对每个可能的终点运行 A*，找到成本最低的路径
+    for (int i = 0; i < numGoalCandidates; ++i) {
+        MAZECOOR currentGoal = goalCandidates[i];
+        MAZECOOR tempPath[OPEN_LIST_MAX_SIZE];
+        int tempPathLen = 0;
+
+        if (findPathAStar(start, currentGoal, tempPath, &tempPathLen)) {
+             // A* 找到路径后，gCost 就是实际成本
+            uint currentCost = aStarNodes[currentGoal.cX][currentGoal.cY].gCost;
+            if (currentCost < minCost) {
+                minCost = currentCost;
+                bestGoal = currentGoal;
+                // 复制路径
+                finalPathLen = tempPathLen;
+                for(int j=0; j < finalPathLen; ++j) {
+                    finalPath[j] = tempPath[j];
+                }
+            }
         }
     }
-    if (GucMapBlock[GucXGoal0][GucYGoal1] & 0x09) {                     /*  判断该终点坐标是否有出口    */
-        mapStepEdit(GucXGoal0,GucYGoal1);                               /*  制作等高图                  */
-        if (ucTemp > GucMapStep[GucXStart][GucYStart]) {                /*  保存离起点最近的坐标        */
-            cXdst  = GucXGoal0;
-            cYdst  = GucYGoal1;
-            ucTemp = GucMapStep[GucXStart][GucYStart];
-        }
+
+
+    // 如果找到了最优路径，则执行
+    if (bestGoal.cX != -1) {
+        // 从起点冲刺到最优终点
+        followAStarPath(finalPath, finalPathLen);
+
+        // （可选）如果需要从终点返回起点，再次调用 A* 或使用反向路径
+         MAZECOOR returnPath[OPEN_LIST_MAX_SIZE];
+         int returnPathLen = 0;
+         if (findPathAStar(bestGoal, start, returnPath, &returnPathLen)) {
+             followAStarPath(returnPath, returnPathLen);
+         }
+
+         mouseTurnback(); // 回到起点后，可能需要调整姿态
+    } else {
+         // 未找到路径的处理逻辑 (例如，显示错误)
+          Download_7289(2, 0, 0, 0x4f); // 'E'
+          Download_7289(2, 1, 0, 0x4f);
+          Download_7289(2, 2, 0, 0x4f);
+          Download_7289(2, 3, 0, 0x4f);
+          while(1); // 停在这里
     }
-    if (GucMapBlock[GucXGoal1][GucYGoal0] & 0x06) {                     /*  判断该终点坐标是否有出口    */
-        mapStepEdit(GucXGoal1,GucYGoal0);                               /*  制作等高图                  */
-        if (ucTemp > GucMapStep[GucXStart][GucYStart]) {                /*  保存离起点最近的坐标        */
-            cXdst  = GucXGoal1;
-            cYdst  = GucYGoal0;
-            ucTemp = GucMapStep[GucXStart][GucYStart];
-        }
-    }
-    if (GucMapBlock[GucXGoal1][GucYGoal1] & 0x03) {                     /*  判断该终点坐标是否有出口    */
-        mapStepEdit(GucXGoal1,GucYGoal1);                               /*  制作等高图                  */
-        if (ucTemp > GucMapStep[GucXStart][GucYStart]) {                /*  保存离起点最近的坐标        */
-            cXdst  = GucXGoal1;
-            cYdst  = GucYGoal1;
-            ucTemp = GucMapStep[GucXStart][GucYStart];
-        }
-    }
-    objectGoTo(cXdst,cYdst);                                            /*  运行到指定目标点            */
 }
 /*********************************************************************************************************
 ** Function name:       objectGoTo
@@ -770,4 +993,5 @@ main (void)
 /*********************************************************************************************************
   END FILE
 *********************************************************************************************************/
+
 
