@@ -1,32 +1,32 @@
 
 
-#include "Drive_7289.h"
+#include "drive_7289.h"
 
 
 /*********************************************************************************************************
 ** Function name:       delayus
-** Descriptions:        ÑÓÊ±N¸öÎ¢Ãë
-** input parameters:    us: ÑÓÊ±Ê±¼ä
-** output parameters:   ÎÞ
-** Returned value:      ÎÞ
+** Descriptions:        ï¿½ï¿½Ê±Nï¿½ï¿½Î¢ï¿½ï¿½
+** input parameters:    us: ï¿½ï¿½Ê±Ê±ï¿½ï¿½
+** output parameters:   ï¿½ï¿½
+** Returned value:      ï¿½ï¿½
 *********************************************************************************************************/
 void delayus (int us)
 {
-    us = SysCtlClockGet() * us / 2000000;                         /*  ¸ù¾ÝÏµÍ³Ê±ÖÓËÙÂÊÈ·¶¨ÑÓÊ±    */
+    us = SysCtlClockGet() * us / 2000000;                         /*  ï¿½ï¿½ï¿½ï¿½ÏµÍ³Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½Ê±    */
     while (us != 0)us--;
 }
 
 /*********************************************************************************************************
 ** Function name:       SPIWrite_7289
-** Descriptions:        ÏòSPI ×ÜÏßÐ´Èë1 ¸ö×Ö½ÚµÄÊý¾Ý¡£
-** input parameters:    data£ºÒªÐ´ÈëµÄÊý¾Ý
-** output parameters:   ÎÞ
-** Returned value:      ÎÞ
+** Descriptions:        ï¿½ï¿½SPI ï¿½ï¿½ï¿½ï¿½Ð´ï¿½ï¿½1 ï¿½ï¿½ï¿½Ö½Úµï¿½ï¿½ï¿½ï¿½Ý¡ï¿½
+** input parameters:    dataï¿½ï¿½ÒªÐ´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+** output parameters:   ï¿½ï¿½
+** Returned value:      ï¿½ï¿½
 *********************************************************************************************************/
 void SPIWrite_7289 (char data)
 {
-    GPIODirModeSet(GPIO_PORTA_BASE, DIO_7289, GPIO_DIR_MODE_OUT);    /*  ÉèÖÃDIO¶Ë¿ÚÎªÊä³öÄ£Ê½       */
-    /****Ñ­»·Ð´Ò»¸ö×Ö½ÚµÄÊý¾Ý  *****/
+    GPIODirModeSet(GPIO_PORTA_BASE, DIO_7289, GPIO_DIR_MODE_OUT);    /*  ï¿½ï¿½ï¿½ï¿½DIOï¿½Ë¿ï¿½Îªï¿½ï¿½ï¿½Ä£Ê½       */
+    /****Ñ­ï¿½ï¿½Ð´Ò»ï¿½ï¿½ï¿½Ö½Úµï¿½ï¿½ï¿½ï¿½ï¿½  *****/
     for(char cnt = 8;cnt>0;cnt--) 
     {
         if((data & 0x80) == 0x80) {
@@ -45,17 +45,17 @@ void SPIWrite_7289 (char data)
 
 /*********************************************************************************************************
 ** Function name:       SPIRead_7289
-** Descriptions:        ´ÓSPI ×ÜÏß¶ÁÈ¡1 ¸ö×Ö½ÚµÄÊý¾Ý¡£
-** input parameters:    ÎÞ
-** output parameters:   ÎÞ
-** Returned value:      ¶ÁÈ¡µ½µÄÊý¾Ý
+** Descriptions:        ï¿½ï¿½SPI ï¿½ï¿½ï¿½ß¶ï¿½È¡1 ï¿½ï¿½ï¿½Ö½Úµï¿½ï¿½ï¿½ï¿½Ý¡ï¿½
+** input parameters:    ï¿½ï¿½
+** output parameters:   ï¿½ï¿½
+** Returned value:      ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 *********************************************************************************************************/
 char SPIRead_7289 (void)
 {
     char data = 0;
-    GPIODirModeSet(GPIO_PORTA_BASE, DIO_7289, GPIO_DIR_MODE_IN);     /* ÉèÖÃDIO¶Ë¿ÚÎªÊä³öÄ£Ê½        */
+    GPIODirModeSet(GPIO_PORTA_BASE, DIO_7289, GPIO_DIR_MODE_IN);     /* ï¿½ï¿½ï¿½ï¿½DIOï¿½Ë¿ï¿½Îªï¿½ï¿½ï¿½Ä£Ê½        */
     /*
-     *  Ñ­»·¶ÁÒ»¸ö×Ö½ÚµÄÊý¾Ý
+     *  Ñ­ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ö½Úµï¿½ï¿½ï¿½ï¿½ï¿½
      */
     for(char cnt = 8;cnt>0;cnt--)
     {
@@ -74,10 +74,10 @@ char SPIRead_7289 (void)
 
 /*********************************************************************************************************
 ** Function name:       Cmd_7289
-** Descriptions:        Ö´ÐÐZLG7289 ´¿Ö¸Áî¡£
-** input parameters:    cmd£ºÃüÁî×Ö
-** output parameters:   ÎÞ
-** Returned value:      ÎÞ
+** Descriptions:        Ö´ï¿½ï¿½ZLG7289 ï¿½ï¿½Ö¸ï¿½î¡£
+** input parameters:    cmdï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+** output parameters:   ï¿½ï¿½
+** Returned value:      ï¿½ï¿½
 *********************************************************************************************************/
 void Cmd_7289 (char  cmd)
 {
@@ -91,11 +91,11 @@ void Cmd_7289 (char  cmd)
 
 /*********************************************************************************************************
 ** Function name:       CmdDat_7289
-** Descriptions:        Ö´ÐÐZLG7289 ´øÊý¾ÝÖ¸Áî¡£
-** input parameters:    cCmd£ºÃüÁî×Ö
-**                      data£ºÊý¾Ý
-** output parameters:   ÎÞ
-** Returned value:      ÎÞ
+** Descriptions:        Ö´ï¿½ï¿½ZLG7289 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½î¡£
+** input parameters:    cCmdï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+**                      dataï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+** output parameters:   ï¿½ï¿½
+** Returned value:      ï¿½ï¿½
 *********************************************************************************************************/
 void CmdDat_7289 (uchar  cmd, char  data)
 {
@@ -111,16 +111,16 @@ void CmdDat_7289 (uchar  cmd, char  data)
 
 /*********************************************************************************************************
 ** Function name:       Download_7289
-** Descriptions:        ÏÂÔØÊý¾Ý¡£
-** input parameters:    mode=0£º ÏÂÔØÊý¾ÝÇÒ°´·½Ê½0 ÒëÂë
-**                      mode=1£º ÏÂÔØÊý¾ÝÇÒ°´·½Ê½1 ÒëÂë
-**                      mode=2£º ÏÂÔØÊý¾Ýµ«²»ÒëÂë
-**                      number£º      ÊýÂë¹Ü±àºÅ£¨ºá×ø±ê£©£¬È¡Öµ0¡«7
-**                      dp=0£º   Ð¡Êýµã²»ÁÁ
-**                      dp=1£º   Ð¡ÊýµãÁÁ
-**                      data£º    ÒªÏÔÊ¾µÄÊý¾Ý
-** output parameters:   ÎÞ
-** Returned value:      ÎÞ
+** Descriptions:        ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¡ï¿½
+** input parameters:    mode=0ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò°ï¿½ï¿½ï¿½Ê½0 ï¿½ï¿½ï¿½ï¿½
+**                      mode=1ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò°ï¿½ï¿½ï¿½Ê½1 ï¿½ï¿½ï¿½ï¿½
+**                      mode=2ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ýµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+**                      numberï¿½ï¿½      ï¿½ï¿½ï¿½ï¿½Ü±ï¿½Å£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ê£©ï¿½ï¿½È¡Öµ0ï¿½ï¿½7
+**                      dp=0ï¿½ï¿½   Ð¡ï¿½ï¿½ï¿½ã²»ï¿½ï¿½
+**                      dp=1ï¿½ï¿½   Ð¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+**                      dataï¿½ï¿½    Òªï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+** output parameters:   ï¿½ï¿½
+** Returned value:      ï¿½ï¿½
 *********************************************************************************************************/
 void Download_7289 (uchar  mode, char  number, char  dp, char  data)
 {
@@ -146,10 +146,10 @@ void Download_7289 (uchar  mode, char  number, char  dp, char  data)
 
 /*********************************************************************************************************
 ** Function name:       Key_7289
-** Descriptions:        Ö´ÐÐZLG7289 ¼üÅÌÃüÁî¡£
-** input parameters:    ÎÞ
-** output parameters:   ÎÞ
-** Returned value:      ·µ»Ø¶Áµ½µÄ°´¼üÖµ£º0¡«63¡£Èç¹û·µ»Ø0xFF Ôò±íÊ¾Ã»ÓÐ¼ü°´ÏÂ
+** Descriptions:        Ö´ï¿½ï¿½ZLG7289 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½î¡£
+** input parameters:    ï¿½ï¿½
+** output parameters:   ï¿½ï¿½
+** Returned value:      ï¿½ï¿½ï¿½Ø¶ï¿½ï¿½ï¿½ï¿½Ä°ï¿½ï¿½ï¿½Öµï¿½ï¿½0ï¿½ï¿½63ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½0xFF ï¿½ï¿½ï¿½Ê¾Ã»ï¿½Ð¼ï¿½ï¿½ï¿½ï¿½ï¿½
 *********************************************************************************************************/
 char KeyDrive_7289 (void)
 {
@@ -167,22 +167,22 @@ char KeyDrive_7289 (void)
 
 /*********************************************************************************************************
 ** Function name:       Init_7289
-** Descriptions:        ZLG7289 ³õÊ¼»¯
-** input parameters:    ÎÞ
-** output parameters:   ÎÞ
-** Returned value:      ÎÞ
+** Descriptions:        ZLG7289 ï¿½ï¿½Ê¼ï¿½ï¿½
+** input parameters:    ï¿½ï¿½
+** output parameters:   ï¿½ï¿½
+** Returned value:      ï¿½ï¿½
 *********************************************************************************************************/
 void Init_7289 (void)
 {
-    SysCtlPeripheralEnable( SYSCTL_PERIPH_GPIOA );                              /*  Ê¹ÄÜGPIO A¿ÚÍâÉè    */
+    SysCtlPeripheralEnable( SYSCTL_PERIPH_GPIOA );                              /*  Ê¹ï¿½ï¿½GPIO Aï¿½ï¿½ï¿½ï¿½ï¿½ï¿½    */
     
-    GPIODirModeSet(GPIO_PORTA_BASE,CS_7289|CLK_7289|DIO_7289,GPIO_DIR_MODE_OUT);/*  ÉèÖÃI/O¿ÚÎªÊä³öÄ£Ê½ */
+    GPIODirModeSet(GPIO_PORTA_BASE,CS_7289|CLK_7289|DIO_7289,GPIO_DIR_MODE_OUT);/*  ï¿½ï¿½ï¿½ï¿½I/Oï¿½ï¿½Îªï¿½ï¿½ï¿½Ä£Ê½ */
     
     GPIOPinWrite(GPIO_PORTA_BASE, DIO_7289, 0xff);
     GPIOPinWrite(GPIO_PORTA_BASE, CLK_7289, 0x00);
     GPIOPinWrite(GPIO_PORTA_BASE, CS_7289 , 0xff);
     
-    Reset_7289();                                                               /*  ¸´Î»ZLG7289     */
+    Reset_7289();                                                               /*  ï¿½ï¿½Î»ZLG7289     */
 }
 
 
