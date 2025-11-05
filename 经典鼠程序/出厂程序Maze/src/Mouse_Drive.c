@@ -535,7 +535,7 @@ void mazeSearch(void)
         if (__GucDistance[__FRONT]) {                                   /*  ǰ����ǽ������������        */
             __GmRight.uiPulse = __GmRight.uiPulseCtr + 70;
             __GmLeft.uiPulse  = __GmLeft.uiPulseCtr  + 70;
-            while (1) {
+            while (__GucDistance[__FRONT]) {
                 if ((__GmLeft.uiPulseCtr + 20) > __GmLeft.uiPulse) {
                     goto End;
                 }
